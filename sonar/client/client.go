@@ -48,6 +48,7 @@ type Client struct {
 	limiter       ratelimit.Limiter
 	statProcessor *stat.Processor
 	logger        *log.Logger
+	sender        stat.Sender
 
 	peers map[string]*peer
 
@@ -68,17 +69,23 @@ type Client struct {
 // NewClient creates a Client with the given configuration, rate limiter,
 // statistics processor, and logger. It initializes four salt patterns
 // (0xFF, 0x00, 0x5A, deterministic random) for bit-flip detection.
+// If sender is nil, a LogSender with the provided logger is used.
 func NewClient(conf *config.Config, limiter ratelimit.Limiter,
-	statProcessor *stat.Processor, logger *log.Logger,
+	statProcessor *stat.Processor, sender stat.Sender, logger *log.Logger,
 ) *Client {
 	if conf.MsgLen < codec.MsgHeaderLen {
 		conf.MsgLen = codec.MsgHeaderLen
+	}
+
+	if sender == nil {
+		sender = stat.NewLogSender(logger, conf.Verbose)
 	}
 
 	c := &Client{
 		conf:             conf,
 		limiter:          limiter,
 		logger:           logger,
+		sender:           sender,
 		statProcessor:    statProcessor,
 		peers:            make(map[string]*peer),
 		ExitOnReachLimit: true,
@@ -128,7 +135,7 @@ func (c *Client) initPeers() {
 
 		s := stat.NewStat(c.conf.ClientAddr, addr,
 			c.conf.ClientPortRange, c.conf.ServerPortRange,
-			c.conf.RateInSpan, c.conf.Span, c.conf.Delay, c.conf.Verbose, c.logger)
+			c.conf.RateInSpan, c.conf.Span, c.conf.Delay, c.sender)
 		c.statProcessor.AddStat(s)
 		p.stat = s
 	}

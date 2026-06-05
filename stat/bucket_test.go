@@ -757,7 +757,7 @@ func TestNewStatAndStatOnce(_ *testing.T) {
 	logger := newTestLogger()
 	s := NewStat("1.2.3.4", "5.6.7.8",
 		PortRange{Min: 43500, Max: 43599}, PortRange{Min: 43500, Max: 43509},
-		100, time.Second, 100*time.Millisecond, false, logger)
+		100, time.Second, 100*time.Millisecond, NewLogSender(logger, false))
 
 	ts := time.Now().UnixNano()
 	s.Put(43500, 43500, 1, ts)
@@ -771,7 +771,7 @@ func TestNewStatAndStatOnceEmpty(_ *testing.T) {
 	logger := newTestLogger()
 	s := NewStat("1.2.3.4", "5.6.7.8",
 		PortRange{Min: 43500, Max: 43599}, PortRange{Min: 43500, Max: 43509},
-		100, time.Second, 100*time.Millisecond, false, logger)
+		100, time.Second, 100*time.Millisecond, NewLogSender(logger, false))
 
 	ud := s.(*udpStat)
 	ud.statOnce() // should not panic on empty
@@ -781,7 +781,7 @@ func TestStatPutDeleteReceived(_ *testing.T) {
 	logger := newTestLogger()
 	s := NewStat("1.2.3.4", "5.6.7.8",
 		PortRange{Min: 43500, Max: 43599}, PortRange{Min: 43500, Max: 43509},
-		100, time.Second, 100*time.Millisecond, false, logger)
+		100, time.Second, 100*time.Millisecond, NewLogSender(logger, false))
 
 	ts := time.Now().UnixNano()
 	s.Put(43500, 43500, 1, ts)
@@ -797,7 +797,7 @@ func TestStatReceivedAndFix(_ *testing.T) {
 	logger := newTestLogger()
 	s := NewStat("1.2.3.4", "5.6.7.8",
 		PortRange{Min: 43500, Max: 43599}, PortRange{Min: 43500, Max: 43509},
-		100, time.Second, 100*time.Millisecond, false, logger)
+		100, time.Second, 100*time.Millisecond, NewLogSender(logger, false))
 
 	ts := time.Now().UnixNano()
 	s.Put(43500, 43500, 1, ts)
@@ -811,7 +811,7 @@ func TestStatMultipleBuckets(_ *testing.T) {
 	logger := newTestLogger()
 	s := NewStat("1.2.3.4", "5.6.7.8",
 		PortRange{Min: 43500, Max: 43599}, PortRange{Min: 43500, Max: 43509},
-		100, time.Second, 100*time.Millisecond, false, logger)
+		100, time.Second, 100*time.Millisecond, NewLogSender(logger, false))
 
 	now := time.Now()
 	for i := 0; i < 5; i++ {
@@ -836,7 +836,7 @@ func TestProcessorAddStat(t *testing.T) {
 	logger := newTestLogger()
 	s := NewStat("1.2.3.4", "5.6.7.8",
 		PortRange{Min: 43500, Max: 43599}, PortRange{Min: 43500, Max: 43509},
-		100, time.Second, 100*time.Millisecond, false, logger)
+		100, time.Second, 100*time.Millisecond, NewLogSender(logger, false))
 	p.AddStat(s)
 
 	if len(p.stats) != 1 {
@@ -849,7 +849,7 @@ func TestProcessorRunAndCancel(t *testing.T) {
 	logger := newTestLogger()
 	s := NewStat("1.2.3.4", "5.6.7.8",
 		PortRange{Min: 43500, Max: 43599}, PortRange{Min: 43500, Max: 43509},
-		100, time.Second, 50*time.Millisecond, false, logger)
+		100, time.Second, 50*time.Millisecond, NewLogSender(logger, false))
 	p.AddStat(s)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -878,7 +878,7 @@ func TestProcessorMultipleStats(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		s := NewStat("1.2.3.4", "5.6.7.8",
 			PortRange{Min: 43500, Max: 43599}, PortRange{Min: 43500, Max: 43509},
-			100, time.Second, 100*time.Millisecond, false, logger)
+			100, time.Second, 100*time.Millisecond, NewLogSender(logger, false))
 		p.AddStat(s)
 	}
 
@@ -1094,7 +1094,7 @@ func TestNewServerStat(t *testing.T) {
 	logger := newTestLogger()
 	s := NewServerStat("1.2.3.4", "5.6.7.8",
 		PortRange{Min: 43500, Max: 43599}, PortRange{Min: 43500, Max: 43509},
-		100, time.Second, 100*time.Millisecond, false, logger)
+		100, time.Second, 100*time.Millisecond, NewLogSender(logger, false))
 
 	ts := time.Now().UnixNano()
 	s.ReceivedAndFix(1, ts, 500000, 42, 0, 0, false)
@@ -1110,7 +1110,7 @@ func TestServerStatReceivedAndFixEndToEnd(t *testing.T) {
 	logger := newTestLogger()
 	s := NewServerStat("1.2.3.4", "5.6.7.8",
 		PortRange{Min: 43500, Max: 43599}, PortRange{Min: 43500, Max: 43509},
-		100, time.Second, 100*time.Millisecond, false, logger)
+		100, time.Second, 100*time.Millisecond, NewLogSender(logger, false))
 
 	now := time.Now()
 	span := time.Second

@@ -44,7 +44,7 @@ func testClient(t *testing.T) *Client {
 	limiter := ratelimit.New(100)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	return NewClient(conf, limiter, sp, logger)
+	return NewClient(conf, limiter, sp, nil, logger)
 }
 
 // makeTestUDPPacket constructs a raw UDP packet (header + payload) suitable
@@ -215,7 +215,7 @@ func TestNewClientMinimumMsgLen(t *testing.T) {
 	limiter := ratelimit.New(100)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	if c.conf.MsgLen != codec.MsgHeaderLen {
 		t.Errorf("MsgLen = %d, want %d", c.conf.MsgLen, codec.MsgHeaderLen)
@@ -228,7 +228,7 @@ func TestNewClientSaltPatterns(t *testing.T) {
 	limiter := ratelimit.New(100)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	saltLen := 128 - codec.MsgHeaderLen
 
@@ -262,7 +262,7 @@ func TestNewClientMultiplePeers(t *testing.T) {
 	limiter := ratelimit.New(100)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	if len(c.peers) != 3 {
 		t.Errorf("expected 3 peers, got %d", len(c.peers))
@@ -359,7 +359,7 @@ func TestReachedLimitTimerExpires(t *testing.T) {
 	limiter := ratelimit.New(100)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	// Use a context that cancels after the timer would fire
 	// The timer is Delay + 10s, so we use context cancel after a short wait
@@ -709,7 +709,7 @@ func TestServeWriteCountLimit(_ *testing.T) {
 	limiter := ratelimit.New(10000)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	c.listenPacket = func(_, _ string) (net.PacketConn, error) {
 		return net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
@@ -738,7 +738,7 @@ func TestServeWriteContextCancel(t *testing.T) {
 	limiter := ratelimit.New(10000)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	c.listenPacket = func(_, _ string) (net.PacketConn, error) {
 		return net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
@@ -773,7 +773,7 @@ func TestServeWriteSendDurationLimit(_ *testing.T) {
 	limiter := ratelimit.New(10000)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	c.listenPacket = func(_, _ string) (net.PacketConn, error) {
 		return net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
@@ -815,7 +815,7 @@ func TestServeReadWithUDPConn(t *testing.T) {
 	limiter := ratelimit.New(100)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	c.listenPacket = func(_, address string) (net.PacketConn, error) {
 		return net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP(address)})
@@ -854,7 +854,7 @@ func TestServeReadMultipleConns(t *testing.T) {
 	limiter := ratelimit.New(100)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	c.listenPacket = func(_, address string) (net.PacketConn, error) {
 		return net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP(address)})
@@ -885,7 +885,7 @@ func TestRunContextCancel(t *testing.T) {
 	limiter := ratelimit.New(10000)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	c.listenPacket = func(_, _ string) (net.PacketConn, error) {
 		return net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})

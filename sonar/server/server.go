@@ -31,14 +31,20 @@ type Server struct {
 
 	statProcessor *stat.Processor
 	logger        *log.Logger
+	sender        stat.Sender
 }
 
 // New creates a Server with the given configuration, statistics processor,
 // and logger. It initializes four salt patterns matching the client for
 // correct bit-flip detection and registers per-client stats.
-func New(conf *config.Config, statProcessor *stat.Processor, logger *log.Logger) *Server {
+// If sender is nil, a LogSender with the provided logger is used.
+func New(conf *config.Config, statProcessor *stat.Processor, sender stat.Sender, logger *log.Logger) *Server {
 	if conf.MsgLen < codec.MsgHeaderLen {
 		conf.MsgLen = codec.MsgHeaderLen
+	}
+
+	if sender == nil {
+		sender = stat.NewLogSender(logger, conf.Verbose)
 	}
 
 	s := &Server{
@@ -46,6 +52,7 @@ func New(conf *config.Config, statProcessor *stat.Processor, logger *log.Logger)
 		stats:         make(map[string]stat.Stat),
 		statProcessor: statProcessor,
 		logger:        logger,
+		sender:        sender,
 		salts: map[int][]byte{
 			0: bytes.Repeat([]byte{0xFF}, conf.MsgLen-codec.MsgHeaderLen),
 			1: bytes.Repeat([]byte{0x00}, conf.MsgLen-codec.MsgHeaderLen),
@@ -59,7 +66,7 @@ func New(conf *config.Config, statProcessor *stat.Processor, logger *log.Logger)
 		s.logger.Printf("[INFO] prepare client: %s", addr)
 		st := stat.NewServerStat(addr, conf.ServerAddr(),
 			conf.ClientPortRange, conf.ServerPortRange,
-			conf.RateInSpan, conf.Span, conf.Delay, conf.Verbose, logger)
+			conf.RateInSpan, conf.Span, conf.Delay, s.sender)
 		statProcessor.AddStat(st)
 		s.stats[addr] = st
 	}
@@ -150,7 +157,7 @@ func (s *Server) getOrCreateStat(clientIP string) stat.Stat {
 	s.logger.Printf("[INFO] auto-register client: %s", clientIP)
 	st = stat.NewServerStat(clientIP, s.conf.ServerAddr(),
 		s.conf.ClientPortRange, s.conf.ServerPortRange,
-		s.conf.RateInSpan, s.conf.Span, s.conf.Delay, s.conf.Verbose, s.logger)
+		s.conf.RateInSpan, s.conf.Span, s.conf.Delay, s.sender)
 	s.statProcessor.AddStat(st)
 	s.stats[clientIP] = st
 	return st

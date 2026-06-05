@@ -11,7 +11,7 @@
 A suite of network diagnostic tools developed by Baidu's physical network black-box monitoring team, including:
 - **bitflip**: Detects packet loss and bit-flip errors in large-scale physical networks.
 - **bitflip6**: IPv6 variant of bitflip for IPv6 network diagnostics.
-- More tools: TBD
+- **baize**: Configuration-driven continuous network quality monitoring tool for long-term deployment.
 
 > Produced by Baidu System Department
 
@@ -133,6 +133,102 @@ IPv6 variant of bitflip. Usage is identical to bitflip, with IPv6 addresses:
 # Client side
 sudo ./bitflip6 -r client -s fd00::2
 ```
+
+## baize
+
+A configuration-driven continuous network quality monitoring tool for long-term deployment. Unlike bitflip's command-line flag approach, baize uses a JSON config file and supports running both Client and Server in a single process.
+
+**Key features:**
+- **Config-driven:** All parameters managed via JSON config file, easy for automated deployment.
+- **Single-process dual-role:** Run Client and Server together in one process.
+- **Log rotation:** Built-in daily log rotation with automatic cleanup of expired files and symlink to the latest log.
+- **pprof integration:** Built-in Go pprof HTTP server for runtime profiling.
+- **Graceful shutdown:** Listens for SIGINT/SIGTERM and gracefully shuts down all goroutines.
+
+> The internal version of baize used in Baidu's physical network also supports periodically pulling configuration from a database and pushing data to Kafka for aggregation. The open-source version is simplified to use config files only and output to logs by default, but provides interfaces for custom implementations.
+
+### Use Cases
+
+- **Inter-cluster high-frequency probing:** Continuous monitoring between large-scale clusters; high-frequency probing (default 5000 pps) quickly exposes intermittent packet loss; multi-port coverage of ECMP paths for pinpointing faulty links.
+- **LCC datacenter probing:** Cross-LCC datacenter network quality monitoring; configuration-driven deployment across multiple datacenter nodes.
+- **ADC/DC network migration monitoring:** Continuous monitoring during network equipment cutover and upgrades; before/after quality comparison to quantify migration impact; automatic detection of packet loss and corruption introduced by changes.
+- **Dedicated line monitoring:** Carrier dedicated line quality monitoring; real-time alerts for loss and latency anomalies; data support for SLA evaluation.
+- **Failback verification:** Network quality verification after traffic failback from disaster recovery; confirming no packet loss or bit-flip on the failback path.
+- **Ad-hoc point-to-point monitoring:** Temporary end-to-end probing for troubleshooting; minimal configuration to get started (only requires both IPs); easy to stop after verification.
+
+### Quick Start
+
+**Build:**
+```bash
+go build -o baize ./cmd/baize/
+```
+
+**Create a config file** (e.g., `baize.json`):
+```json
+{
+  "pprof_addr": ":6060",
+  "log_dir": "/var/log/baize",
+  "log_max_age_days": 7,
+  "client": {
+    "client_addr": "10.0.0.1",
+    "server_addrs": "10.0.0.2",
+    "rate_in_span": 5000,
+    "span": "1s",
+    "delay": "3s",
+    "msg_len": 1024,
+    "tos": 64
+  },
+  "server": {
+    "server_addr": "10.0.0.2",
+    "client_addrs": "10.0.0.1",
+    "rate_in_span": 5000,
+    "span": "1s",
+    "delay": "3s",
+    "msg_len": 1024,
+    "tos": 64
+  }
+}
+```
+
+**Run:**
+```bash
+# Use default config file (baize.json)
+sudo ./baize
+
+# Specify config file path
+sudo ./baize -c /etc/baize/baize.json
+```
+
+### Config Reference
+
+**Top-level fields:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `pprof_addr` | string | "" | pprof HTTP listen address (e.g. `:6060`), empty to disable |
+| `log_dir` | string | "" | Log file directory, empty to output to stderr |
+| `log_max_age_days` | int | 7 | Log retention days (≤0 defaults to 7) |
+| `client` | object | null | Client config, null to skip |
+| `server` | object | null | Server config, null to skip |
+
+**Client/Server fields:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `client_addr` / `server_addr` | string | "" | Local IP address |
+| `server_addrs` / `client_addrs` | string | "" | Remote IP address(es), comma-separated |
+| `tos` | int | 0 | IP TOS/DSCP value |
+| `client_port_range` | string | "" | Client port range `min,max` |
+| `server_port_range` | string | "" | Server port range `min,max` |
+| `rate_in_span` | int64 | 0 | Packets per span |
+| `span` | string | "0s" | Stats time window (Go duration) |
+| `delay` | string | "0s" | Stats processing delay |
+| `msg_len` | int | 0 | Message payload size (excluding 32-byte header) |
+| `count` | int | 0 | Max packets to send, client only (0 = unlimited) |
+| `send_duration` | string | "0s" | Max send duration, client only (0 = unlimited) |
+| `verbose` | bool | false | Print per-port loss details |
+
+See [baize usage guide](docs/baize-usage-guide.html) for more details.
 
 ## Testing
 

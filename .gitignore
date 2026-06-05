@@ -4,6 +4,8 @@ bitflip
 !bitflip/
 bitflip6
 !bitflip6/
+baize
+!baize/
 
 # Test and coverage artifacts
 coverage.html

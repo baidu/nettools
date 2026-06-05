@@ -4,8 +4,9 @@ OUTDIR  := $(HOMEDIR)/output
 GOPKGS    := $$(go list ./...| grep -vE "vendor|/cmd")
 COVERPKGS := $$(go list ./... | tr '\n' ',' | sed 's/,$$//')
 
-BINARY  := bitflip
-BINARY6 := bitflip6
+BINARY   := bitflip
+BINARY6  := bitflip6
+BINARYBA := baize
 COVERAGE_FILE := coverage.out
 COVERAGE_HTML := coverage.html
 
@@ -23,12 +24,15 @@ prepare:
 	go mod download
 
 # make compile
-compile: build build6
+compile: build build6 build-baize
 build:
 	go build -o $(HOMEDIR)/$(BINARY) ./cmd/bitflip/
 
 build6:
 	go build -o $(HOMEDIR)/$(BINARY6) ./cmd/bitflip6/
+
+build-baize:
+	go build -o $(HOMEDIR)/$(BINARYBA) ./cmd/baize/
 
 ## test: Run all tests
 test: prepare
@@ -98,6 +102,7 @@ package:
 	mkdir -p $(OUTDIR)
 	mv $(BINARY) $(OUTDIR)/
 	mv $(BINARY6) $(OUTDIR)/
+	mv $(BINARYBA) $(OUTDIR)/
 
 # make lint
 lint:
@@ -174,5 +179,5 @@ help:
 
 .PHONY: all prepare compile test test-short test-race test-coverage treemap test-verbose benchmark \
         test-codec test-stat test-client test-server test-config \
-        lint fmt fmt-check vet check clean tidy install-tools ci help build build6 package \
+        lint fmt fmt-check vet check clean tidy install-tools ci help build build6 build-baize package \
         snapshot deploy

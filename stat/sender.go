@@ -6,9 +6,49 @@ import (
 	"time"
 )
 
+// LogSender implements Sender by writing stat results to a *log.Logger.
+type LogSender struct {
+	logger  *log.Logger
+	verbose bool
+}
+
+// NewLogSender creates a LogSender that writes to the given logger.
+// When verbose is true, per-port loss details are included.
+func NewLogSender(logger *log.Logger, verbose bool) *LogSender {
+	return &LogSender{logger: logger, verbose: verbose}
+}
+
+// Send writes the StatResult to the logger. Loss-free buckets are logged at
+// INFO level; buckets with loss are logged at WARN level with additional
+// loss-port details when verbose is enabled.
+func (s *LogSender) Send(r StatResult) {
+	ts := r.Timestamp.Format("15:04:05")
+	if r.ServerSide {
+		if r.Loss == 0 {
+			s.logger.Printf("[INFO] %s, [%s -> %s], sent: %d, received: %d, loss: %d, loss rate: %.2f%%",
+				ts, r.ClientAddr, r.ServerAddr, r.Sent, r.Received, r.Loss, r.LossRate*100)
+		} else {
+			s.logger.Printf("[WARN] %s, [%s -> %s], sent: %d, received: %d, loss: %d, loss rate: %.2f%%",
+				ts, r.ClientAddr, r.ServerAddr, r.Sent, r.Received, r.Loss, r.LossRate*100)
+			if s.verbose {
+				s.logger.Printf("[WARN] %s, [%s -> %s], loss ports: %v", ts, r.ClientAddr, r.ServerAddr, r.LossPorts)
+			}
+		}
+	} else if r.Loss == 0 {
+		s.logger.Printf("[INFO] %s, [%s -> %s], sent: %d, received: %d, loss: %d, loss rate: %.2f%%, avg rtt: %v ns",
+			ts, r.ClientAddr, r.ServerAddr, r.Sent, r.Received, r.Loss, r.LossRate*100, r.AvgRTT)
+	} else {
+		s.logger.Printf("[WARN] %s, [%s -> %s], sent: %d, received: %d, loss: %d, loss rate: %.2f%%, avg rtt: %v ns",
+			ts, r.ClientAddr, r.ServerAddr, r.Sent, r.Received, r.Loss, r.LossRate*100, r.AvgRTT)
+		if s.verbose {
+			s.logger.Printf("[WARN] %s, [%s -> %s], loss ports: %v", ts, r.ClientAddr, r.ServerAddr, r.LossPorts)
+		}
+	}
+}
+
 // udpStat implements the Stat interface for a single client-server probe pair.
 // It delegates storage to a time-bucketed buckets instance and periodically
-// logs aggregated results via statOnce.
+// sends aggregated results via a Sender.
 type udpStat struct {
 	clientAddr      string
 	serverAddr      string
@@ -16,20 +56,20 @@ type udpStat struct {
 	serverPortRange PortRange
 	lastID          int64
 	serverSide      bool
-	verbose         bool
 
 	bkts       *buckets
 	rateInSpan int64
 	span       time.Duration
 	delay      time.Duration
 
-	logger *log.Logger
+	sender Sender
 }
 
 // NewStat creates a Stat instance that tracks probe statistics between
 // the given client and server address over the configured port ranges.
+// Results are sent via the provided Sender.
 func NewStat(clientAddr, serverAddr string, clientPortRange, serverPortRange PortRange,
-	rateInSpan int64, span, delay time.Duration, verbose bool, logger *log.Logger) Stat {
+	rateInSpan int64, span, delay time.Duration, sender Sender) Stat {
 	return &udpStat{
 		bkts:            newBuckets(span, rateInSpan, false),
 		clientAddr:      clientAddr,
@@ -39,13 +79,15 @@ func NewStat(clientAddr, serverAddr string, clientPortRange, serverPortRange Por
 		rateInSpan:      rateInSpan,
 		span:            span,
 		delay:           delay,
-		verbose:         verbose,
-		logger:          logger,
+		sender:          sender,
 	}
 }
 
+// NewServerStat creates a server-side Stat instance that tracks probe
+// statistics for the given client-server pair. Results are sent via
+// the provided Sender.
 func NewServerStat(clientAddr, serverAddr string, clientPortRange, serverPortRange PortRange,
-	rateInSpan int64, span, delay time.Duration, verbose bool, logger *log.Logger) Stat {
+	rateInSpan int64, span, delay time.Duration, sender Sender) Stat {
 	return &udpStat{
 		bkts:            newBuckets(span, rateInSpan, true),
 		clientAddr:      clientAddr,
@@ -56,14 +98,14 @@ func NewServerStat(clientAddr, serverAddr string, clientPortRange, serverPortRan
 		span:            span,
 		delay:           delay,
 		serverSide:      true,
-		verbose:         verbose,
-		logger:          logger,
+		sender:          sender,
 	}
 }
 
 // statOnce processes the oldest time bucket that has passed the delay
-// window. It computes loss/received/RTT statistics, logs them, and
-// removes the bucket. Buckets that haven't aged past the delay are skipped.
+// window. It computes loss/received/RTT statistics, sends them via
+// the Sender, and removes the bucket. Buckets that haven't aged past
+// the delay are skipped.
 func (s *udpStat) statOnce() {
 	lastID := s.lastID
 	b := s.bkts.oldest()
@@ -89,12 +131,27 @@ func (s *udpStat) statOnce() {
 
 	sr := b.stat()
 
-	if s.serverSide && s.verbose && sr.loss > 0 {
+	if s.serverSide {
 		sr.lossPorts, sr.lossPortsCount = s.computeServerLossPorts(b)
 	}
 
-	if s.lastID > 0 {
-		s.logStat(sr, b.startNano)
+	if s.lastID > 0 && s.sender != nil {
+		s.sender.Send(StatResult{
+			Timestamp:         time.Unix(0, b.startNano),
+			ClientAddr:        s.clientAddr,
+			ServerAddr:        s.serverAddr,
+			ServerSide:        s.serverSide,
+			Sent:              sr.sent,
+			Received:          sr.received,
+			Loss:              sr.loss,
+			LossRate:          sr.lossRate,
+			AvgRTT:            sr.rtt,
+			MaxRTT:            sr.maxRTT,
+			LossPorts:         sr.lossPorts,
+			BitflipPorts:      sr.bitflipPorts,
+			LossPortsCount:    sr.lossPortsCount,
+			BitflipPortsCount: sr.bitflipPortsCount,
+		})
 	}
 	s.bkts.remove(b.id)
 }
@@ -147,34 +204,6 @@ func (s *udpStat) computeServerLossPorts(b *bucket) (map[int]int, map[string]int
 	}
 
 	return lossPorts, lossPortsCount
-}
-
-// logStat writes the aggregated statResult to the logger. Loss-free
-// buckets are logged at INFO level; buckets with loss are logged at
-// WARN level with additional loss-port details.
-func (s *udpStat) logStat(sr statResult, startNano int64) {
-	ts := time.Unix(0, startNano).Format("15:04:05")
-	if s.serverSide {
-		if sr.loss == 0 {
-			s.logger.Printf("[INFO] %s, [%s -> %s], sent: %d, received: %d, loss: %d, loss rate: %.2f%%",
-				ts, s.clientAddr, s.serverAddr, sr.sent, sr.received, sr.loss, sr.lossRate*100)
-		} else {
-			s.logger.Printf("[WARN] %s, [%s -> %s], sent: %d, received: %d, loss: %d, loss rate: %.2f%%",
-				ts, s.clientAddr, s.serverAddr, sr.sent, sr.received, sr.loss, sr.lossRate*100)
-			if s.verbose {
-				s.logger.Printf("[WARN] %s, [%s -> %s], loss ports: %v", ts, s.clientAddr, s.serverAddr, sr.lossPorts)
-			}
-		}
-	} else if sr.loss == 0 {
-		s.logger.Printf("[INFO] %s, [%s -> %s], sent: %d, received: %d, loss: %d, loss rate: %.2f%%, avg rtt: %v ns",
-			ts, s.clientAddr, s.serverAddr, sr.sent, sr.received, sr.loss, sr.lossRate*100, sr.rtt)
-	} else {
-		s.logger.Printf("[WARN] %s, [%s -> %s], sent: %d, received: %d, loss: %d, loss rate: %.2f%%, avg rtt: %v ns",
-			ts, s.clientAddr, s.serverAddr, sr.sent, sr.received, sr.loss, sr.lossRate*100, sr.rtt)
-		if s.verbose {
-			s.logger.Printf("[WARN] %s, [%s -> %s], loss ports: %v", ts, s.clientAddr, s.serverAddr, sr.lossPorts)
-		}
-	}
 }
 
 func (s *udpStat) Put(clientPort, serverPort uint16, seq uint64, ts int64) {

@@ -113,7 +113,7 @@ func runClient(ctx context.Context, cfg *config.Config, logger *log.Logger) {
 	go proc.Run(ctx)
 
 	limiter := ratelimit.New(int(cfg.RateInSpan), ratelimit.Per(cfg.Span))
-	c := client.NewClient(cfg, limiter, proc, logger)
+	c := client.NewClient(cfg, limiter, proc, nil, logger)
 	c.ExitOnReachLimit = false
 
 	go func() {
@@ -130,7 +130,7 @@ func runServer(ctx context.Context, cfg *config.Config, logger *log.Logger) {
 	proc := stat.NewProcessor(cfg.Span, cfg.Delay)
 	go proc.Run(ctx)
 
-	s := server.New(cfg, proc, logger)
+	s := server.New(cfg, proc, nil, logger)
 	s.Run(ctx)
 	log.Printf("[INFO] server %s for clients %v", cfg.ServerAddr(), cfg.ClientAddrs)
 }

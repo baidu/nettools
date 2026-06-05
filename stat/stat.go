@@ -1,7 +1,34 @@
 // Package stat provides time-bucketed statistics collection for UDP probe
 // packets. It tracks per-bucket sent/received counts, loss rates, RTT, and
-// bit-flip events, and periodically logs summary reports.
+// bit-flip events, and periodically reports summary via a pluggable Sender.
 package stat
+
+import "time"
+
+// Sender is the interface for consuming aggregated stat results.
+// Implementations can write to logs, send to Kafka, push to ClickHouse, etc.
+type Sender interface {
+	// Send is called once per time bucket with the aggregated statistics.
+	Send(result StatResult)
+}
+
+// StatResult holds the aggregated statistics for a single time bucket.
+type StatResult struct {
+	Timestamp         time.Time
+	ClientAddr        string
+	ServerAddr        string
+	ServerSide        bool
+	Sent              int
+	Received          int
+	Loss              int
+	LossRate          float64
+	AvgRTT            int64
+	MaxRTT            int64
+	LossPorts         map[int]int
+	BitflipPorts      map[int]int
+	LossPortsCount    map[string]int
+	BitflipPortsCount map[string]int
+}
 
 // Stat is the interface for recording probe packet statistics.
 // Implementations track sent, received, lost, and bit-flipped packets

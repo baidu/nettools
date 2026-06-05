@@ -45,7 +45,7 @@ func testClient(t *testing.T) *Client {
 	limiter := ratelimit.New(100)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	return NewClient(conf, limiter, sp, logger)
+	return NewClient(conf, limiter, sp, nil, logger)
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +243,7 @@ func TestNewClientMinimumMsgLen(t *testing.T) {
 	limiter := ratelimit.New(100)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	if c.conf.MsgLen != codec.MsgHeaderLen {
 		t.Errorf("MsgLen = %d, want %d", c.conf.MsgLen, codec.MsgHeaderLen)
@@ -256,7 +256,7 @@ func TestNewClientSaltPatterns(t *testing.T) {
 	limiter := ratelimit.New(100)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	saltLen := 128 - codec.MsgHeaderLen
 
@@ -290,7 +290,7 @@ func TestNewClientMultiplePeers(t *testing.T) {
 	limiter := ratelimit.New(100)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	if len(c.peers) != 3 {
 		t.Errorf("expected 3 peers, got %d", len(c.peers))
@@ -330,7 +330,7 @@ func TestInitPeersIPv6Addresses(t *testing.T) {
 	limiter := ratelimit.New(100)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	// Key is canonicalized: net.ParseIP("fd00::1").String() = "fd00::1"
 	p := c.peers["fd00::1"]
@@ -370,7 +370,7 @@ func TestInitPeersStatRegistered(t *testing.T) {
 	limiter := ratelimit.New(100)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	p := c.peers["::1"]
 	if p == nil {
@@ -388,7 +388,7 @@ func TestInitPeersCanonicalKey(t *testing.T) {
 	limiter := ratelimit.New(100)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	// The extended form should NOT be the key
 	if c.peers["fd00:0:0:0:0:0:0:1"] != nil {
@@ -659,7 +659,7 @@ func TestHandlePacketLinkLocalWithZone(t *testing.T) {
 	limiter := ratelimit.New(100)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	p := c.peers["fe80::1"]
 	if p == nil {
@@ -922,7 +922,7 @@ func TestServeWriteCountLimit(_ *testing.T) {
 	limiter := ratelimit.New(10000)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	c.listenPacket = func(_, _ string) (net.PacketConn, error) {
 		return net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("::1")})
@@ -947,7 +947,7 @@ func TestServeWriteSendDurationLimit(_ *testing.T) {
 	limiter := ratelimit.New(10000)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	c.listenPacket = func(_, _ string) (net.PacketConn, error) {
 		return net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("::1")})
@@ -970,7 +970,7 @@ func TestServeWriteContextCancel(t *testing.T) {
 	limiter := ratelimit.New(10000)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	c.listenPacket = func(_, _ string) (net.PacketConn, error) {
 		return net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("::1")})
@@ -1021,7 +1021,7 @@ func TestServeReadWithUDPConn(t *testing.T) {
 	limiter := ratelimit.New(100)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	c.listenPacket = func(_, _ string) (net.PacketConn, error) {
 		return net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("::1")})
@@ -1073,7 +1073,7 @@ func TestServeReadGoroutineCount(t *testing.T) {
 			limiter := ratelimit.New(100)
 			sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 			logger := log.New(io.Discard, "", 0)
-			c := NewClient(conf, limiter, sp, logger)
+			c := NewClient(conf, limiter, sp, nil, logger)
 
 			c.listenPacket = func(_, _ string) (net.PacketConn, error) {
 				return net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("::1")})
@@ -1105,7 +1105,7 @@ func TestRunContextCancel(t *testing.T) {
 	limiter := ratelimit.New(10000)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	c := NewClient(conf, limiter, sp, logger)
+	c := NewClient(conf, limiter, sp, nil, logger)
 
 	c.listenPacket = func(_, _ string) (net.PacketConn, error) {
 		return net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("::1")})

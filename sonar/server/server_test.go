@@ -48,7 +48,7 @@ func TestNew(t *testing.T) {
 	conf := testServerConfig(0)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	s := New(conf, sp, logger)
+	s := New(conf, sp, nil, logger)
 
 	if s == nil {
 		t.Fatal("expected non-nil server")
@@ -69,7 +69,7 @@ func TestNewMinimumMsgLen(t *testing.T) {
 	conf.MsgLen = 10
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	s := New(conf, sp, logger)
+	s := New(conf, sp, nil, logger)
 
 	if s.conf.MsgLen != codec.MsgHeaderLen {
 		t.Errorf("MsgLen = %d, want %d", s.conf.MsgLen, codec.MsgHeaderLen)
@@ -81,7 +81,7 @@ func TestNewSaltPatterns(t *testing.T) {
 	conf.MsgLen = 128
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	s := New(conf, sp, logger)
+	s := New(conf, sp, nil, logger)
 
 	saltLen := 128 - codec.MsgHeaderLen
 
@@ -104,7 +104,7 @@ func TestNewMultipleClients(t *testing.T) {
 	conf.ClientAddrs = []string{"10.0.0.1", "10.0.0.2"}
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	s := New(conf, sp, logger)
+	s := New(conf, sp, nil, logger)
 
 	if len(s.stats) != 2 {
 		t.Errorf("expected 2 stat entries, got %d", len(s.stats))
@@ -116,7 +116,7 @@ func startTestServer(t *testing.T, port int) (*Server, context.CancelFunc) {
 	conf := testServerConfig(port)
 	sp := stat.NewProcessor(time.Second, 100*time.Millisecond)
 	logger := log.New(io.Discard, "", 0)
-	s := New(conf, sp, logger)
+	s := New(conf, sp, nil, logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go s.Run(ctx)

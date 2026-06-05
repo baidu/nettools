@@ -1,0 +1,31 @@
+{
+  "pprof_addr": ":6060",
+  "log_dir": "",
+  "log_max_age_days": 7,
+  "client": {
+    "client_addr": "10.0.0.1",
+    "server_addrs": "10.0.0.2",
+    "tos": 64,
+    "client_port_range": "43500,43599",
+    "server_port_range": "43600,43609",
+    "rate_in_span": 5000,
+    "span": "1s",
+    "delay": "3s",
+    "msg_len": 1024,
+    "count": 0,
+    "send_duration": "0s",
+    "verbose": false
+  },
+  "server": {
+    "server_addr": "10.0.0.2",
+    "client_addrs": "10.0.0.1",
+    "tos": 64,
+    "client_port_range": "43500,43599",
+    "server_port_range": "43600,43609",
+    "rate_in_span": 5000,
+    "span": "1s",
+    "delay": "3s",
+    "msg_len": 1024,
+    "verbose": false
+  }
+}
