@@ -2,10 +2,10 @@ package ping
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"log"
-	cryptorand "crypto/rand"
 	"math/rand"
 	"net"
 	"os"
