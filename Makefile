@@ -7,6 +7,8 @@ COVERPKGS := $$(go list ./... | tr '\n' ',' | sed 's/,$$//')
 BINARY   := bitflip
 BINARY6  := bitflip6
 BINARYBA := baize
+BINARYMP  := mping
+BINARYMP6 := mping6
 COVERAGE_FILE := coverage.out
 COVERAGE_HTML := coverage.html
 
@@ -29,7 +31,7 @@ prepare:
 	go mod download
 
 # make compile
-compile: build build6 build-baize
+compile: build build6 build-baize build-mping build-mping6
 build:
 	go build -ldflags "$(LDFLAGS)" -o $(HOMEDIR)/$(BINARY) ./cmd/bitflip/
 
@@ -38,6 +40,12 @@ build6:
 
 build-baize:
 	go build -ldflags "$(LDFLAGS)" -o $(HOMEDIR)/$(BINARYBA) ./cmd/baize/
+
+build-mping:
+	go build -ldflags "$(LDFLAGS)" -o $(HOMEDIR)/$(BINARYMP) ./cmd/mping/
+
+build-mping6:
+	go build -ldflags "$(LDFLAGS)" -o $(HOMEDIR)/$(BINARYMP6) ./cmd/mping6/
 
 ## test: Run all tests
 test: prepare
@@ -108,6 +116,7 @@ package:
 	mv $(BINARY) $(OUTDIR)/
 	mv $(BINARY6) $(OUTDIR)/
 	mv $(BINARYBA) $(OUTDIR)/
+	mv $(BINARYMP) $(OUTDIR)/
 
 # make lint
 lint:
@@ -184,5 +193,5 @@ help:
 
 .PHONY: all prepare compile test test-short test-race test-coverage treemap test-verbose benchmark \
         test-codec test-stat test-client test-server test-config \
-        lint fmt fmt-check vet check clean tidy install-tools ci help build build6 build-baize package \
+        lint fmt fmt-check vet check clean tidy install-tools ci help build build6 build-baize build-mping build-mping6 package \
         snapshot deploy
