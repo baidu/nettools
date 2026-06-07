@@ -169,7 +169,7 @@ func setSocketTimeouts(fd int, timeout time.Duration) error {
 	if sec == 0 && usec == 0 {
 		sec = 1
 	}
-	tv := unix.Timeval{Sec: sec, Usec: int32(usec)}
+	tv := unix.Timeval{Sec: sec, Usec: usec}
 	if err := unix.SetsockoptTimeval(fd, unix.SOL_SOCKET, unix.SO_RCVTIMEO, &tv); err != nil {
 		return err
 	}
