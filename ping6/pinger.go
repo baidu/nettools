@@ -277,8 +277,6 @@ func (p *Pinger) serveRecv(stopCh <-chan struct{}) error {
 			return err
 		}
 
-		_ = ra
-
 		var rxts int64
 		if p.supportRxTS {
 			if ts, err := getTimestampFromOOB(oob, oobn); err == nil {
@@ -290,28 +288,28 @@ func (p *Pinger) serveRecv(stopCh <-chan struct{}) error {
 			rxts = time.Now().UnixNano()
 		}
 
-		p.processPacket(pktBuf[:n], rxts)
+		p.processPacket(pktBuf[:n], ra, rxts)
 	}
 }
 
 // processPacket parses raw IPv6 packet bytes and routes to the appropriate handler.
-func (p *Pinger) processPacket(raw []byte, rxts int64) {
+func (p *Pinger) processPacket(raw []byte, ra net.Addr, rxts int64) {
+	// On macOS, ReadMsgIP for ip6:ipv6-icmp may or may not include the IPv6
+	// header. Try IPv6 first, fall back to ICMPv6.
 	pkt, err := packet.DissectByProto(raw, "IPv6")
 	if err != nil {
+		pkt, err = packet.DissectByProto(raw, "ICMPv6")
+		if err != nil {
+			return
+		}
+	}
+
+	icmpLayer := pkt.GetLayer("ICMPv6")
+	if icmpLayer == nil {
 		return
 	}
 
-	ipv6Layer := pkt.GetLayer("IPv6")
-	if ipv6Layer == nil {
-		return
-	}
-
-	icmpv6Layer := pkt.GetLayer("ICMPv6")
-	if icmpv6Layer == nil {
-		return
-	}
-
-	icmpTypeVal, err := icmpv6Layer.Get("type")
+	icmpTypeVal, err := icmpLayer.Get("type")
 	if err != nil {
 		return
 	}
@@ -322,20 +320,16 @@ func (p *Pinger) processPacket(raw []byte, rxts int64) {
 
 	switch icmpType {
 	case icmpv6EchoReply:
-		p.handleEchoReply(ipv6Layer, icmpv6Layer, pkt, rxts)
+		p.handleEchoReply(pkt, ra, rxts)
 	case icmpv6DestUnreach, icmpv6TimeExceed:
-		srcVal, _ := ipv6Layer.Get("src")
-		srcIP, _ := srcVal.(net.IP)
-		srcStr := "unknown"
-		if srcIP != nil {
-			srcStr = srcIP.String()
-		}
+		srcStr := addrString(ra)
 		p.handleICMPv6Error(srcStr, icmpType)
 	}
 }
 
 // handleEchoReply processes an ICMPv6 Echo Reply packet.
-func (p *Pinger) handleEchoReply(ipv6Layer, icmpv6Layer *packet.Layer, pkt *packet.Packet, rxts int64) {
+// ra is the remote address from ReadMsgIP, used as the reply source.
+func (p *Pinger) handleEchoReply(pkt *packet.Packet, ra net.Addr, rxts int64) {
 	// The "ICMPv6 Echo Reply" sub-layer has id and seq.
 	echoLayer := pkt.GetLayer("ICMPv6 Echo Reply")
 	if echoLayer == nil {
@@ -358,8 +352,8 @@ func (p *Pinger) handleEchoReply(ipv6Layer, icmpv6Layer *packet.Layer, pkt *pack
 	}
 
 	// Verify the reply came from the expected target.
-	srcVal, _ := ipv6Layer.Get("src")
-	srcIP, _ := srcVal.(net.IP)
+	srcStr := addrString(ra)
+	srcIP := net.ParseIP(srcStr)
 	if srcIP == nil || !srcIP.Equal(t.ip) {
 		return
 	}
@@ -391,10 +385,12 @@ func (p *Pinger) handleEchoReply(ipv6Layer, icmpv6Layer *packet.Layer, pkt *pack
 		rtt = 0
 	}
 
-	// Get hop limit from IPv6 layer.
+	// Try to get hop limit from IPv6 layer (if present).
 	var hlim uint8
-	if hlimVal, err := ipv6Layer.Get("hlim"); err == nil && hlimVal != nil {
-		hlim, _ = hlimVal.(uint8)
+	if ipv6Layer := pkt.GetLayer("IPv6"); ipv6Layer != nil {
+		if hlimVal, err := ipv6Layer.Get("hlim"); err == nil && hlimVal != nil {
+			hlim, _ = hlimVal.(uint8)
+		}
 	}
 
 	// Per-reply output (only when verbose).
@@ -425,4 +421,21 @@ func (p *Pinger) findTargetByICMPID(icmpID uint16) *target {
 		}
 	}
 	return nil
+}
+
+// addrString extracts the IP address string from a net.Addr.
+func addrString(addr net.Addr) string {
+	if addr == nil {
+		return ""
+	}
+	switch a := addr.(type) {
+	case *net.IPAddr:
+		return a.IP.String()
+	case *net.UDPAddr:
+		return a.IP.String()
+	case *net.TCPAddr:
+		return a.IP.String()
+	default:
+		return addr.String()
+	}
 }
