@@ -27,7 +27,7 @@ func enableHardwareTimestamp(interfaceName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create socket: %w", err)
 	}
-		defer func() { _ = syscall.Close(fd) }()
+	defer func() { _ = syscall.Close(fd) }()
 
 	config := unix.HwTstampConfig{
 		Flags:     0,
@@ -57,7 +57,7 @@ func checkHardwareTimestamp(interfaceName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create socket: %w", err)
 	}
-		defer func() { _ = syscall.Close(fd) }()
+	defer func() { _ = syscall.Close(fd) }()
 
 	var config unix.HwTstampConfig
 

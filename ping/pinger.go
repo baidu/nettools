@@ -146,8 +146,10 @@ func (p *Pinger) openConn() (*net.IPConn, error) {
 	p.f = f
 	p.fd = int(f.Fd())
 
-	if err := configureTimestamps(p.fd, p.conf.Interface, p.conf.Verbose, p.logger, &p.supportTxTS, &p.supportRxTS); err != nil {
-		return nil, err
+	if p.conf.Hwts {
+		if err := configureTimestamps(p.fd, p.conf.Interface, p.conf.Verbose, p.logger, &p.supportTxTS, &p.supportRxTS); err != nil {
+			return nil, err
+		}
 	}
 
 	// Set socket timeouts.

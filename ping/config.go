@@ -29,6 +29,7 @@ type Config struct {
 	Interface string
 
 	Verbose bool
+	Hwts    bool
 }
 
 // Validate checks and fills in default values for the configuration.

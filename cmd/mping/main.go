@@ -31,6 +31,7 @@ func main() {
 		rate         int64
 		size         int
 		verbose      bool
+		hwts         bool
 	)
 
 	pflag.StringVarP(&targets, "targets", "T", "", "Comma-separated target IPv4 addresses or CIDR ranges")
@@ -45,6 +46,7 @@ func main() {
 	pflag.Int64VarP(&rate, "rate", "r", 100, "Packets per second per target")
 	pflag.IntVarP(&size, "size", "s", 64, "ICMP payload size in bytes (min: 8)")
 	pflag.BoolVar(&verbose, "verbose", false, "Print per-reply ICMP details")
+	pflag.BoolVar(&hwts, "hwts", true, "Enable hardware timestamping (default: true)")
 
 	showVersion := pflag.BoolP("version", "V", false, "Print version and exit")
 	pflag.Parse()
@@ -120,6 +122,7 @@ func main() {
 		LocalAddr:    localAddr,
 		Interface:    iface,
 		Verbose:      verbose,
+		Hwts:         hwts,
 	}
 
 	if err := cfg.Validate(); err != nil {
