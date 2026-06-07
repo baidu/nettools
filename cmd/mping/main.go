@@ -32,6 +32,7 @@ func main() {
 		size         int
 		verbose      bool
 		hwts         bool
+		maxTargets   int
 	)
 
 	pflag.StringVarP(&targets, "targets", "T", "", "Comma-separated target IPv4 addresses or CIDR ranges")
@@ -47,6 +48,7 @@ func main() {
 	pflag.IntVarP(&size, "size", "s", 64, "ICMP payload size in bytes (min: 8)")
 	pflag.BoolVar(&verbose, "verbose", false, "Print per-reply ICMP details")
 	pflag.BoolVar(&hwts, "hwts", true, "Enable hardware timestamping (default: true)")
+	pflag.IntVar(&maxTargets, "max-targets", 65536, "Max number of targets after CIDR/DNS expansion")
 
 	showVersion := pflag.BoolP("version", "V", false, "Print version and exit")
 	pflag.Parse()
@@ -106,6 +108,11 @@ func main() {
 	if len(resolvedAddrs) == 0 {
 		fmt.Fprintf(os.Stderr, "error: no valid IPv4 target addresses\n")
 		os.Exit(1)
+	}
+
+	if len(resolvedAddrs) > maxTargets {
+		fmt.Fprintf(os.Stderr, "warning: expanded to %d targets, capping at %d (--max-targets)\n", len(resolvedAddrs), maxTargets)
+		resolvedAddrs = resolvedAddrs[:maxTargets]
 	}
 
 	cfg := &ping.Config{
