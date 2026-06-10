@@ -111,7 +111,7 @@ func (c *Client) Run(ctx context.Context) error {
 			return err
 		}
 		gpuSenders[p.gpuIndex] = s
-		defer s.Close()
+		defer func() { _ = s.Close() }()
 		c.logger.Printf("[INFO] [GPU-%d] sender bound to %s (TOS=%d)", p.gpuIndex, p.localGPUIP, c.conf.TOS)
 	}
 
@@ -134,7 +134,7 @@ func (c *Client) Run(ctx context.Context) error {
 				return err
 			}
 			c.gpuReceivers = append(c.gpuReceivers, r)
-			defer r.Close()
+			defer func() { _ = r.Close() }()
 			c.logger.Printf("[INFO] [GPU-%d] receiver on %s, ports %d-%d", p.gpuIndex, p.localGPUIP, i, upper)
 		}
 	}

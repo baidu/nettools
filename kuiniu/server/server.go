@@ -83,7 +83,7 @@ func (s *Server) Run(ctx context.Context) error {
 			return err
 		}
 		gpuSenders[i] = sender
-		defer sender.Close()
+		defer func() { _ = sender.Close() }()
 		s.logger.Printf("[INFO] [GPU-%d] sender bound to %s (TOS=%d)", i, gpuIP, s.conf.TOS)
 	}
 
@@ -96,7 +96,7 @@ func (s *Server) Run(ctx context.Context) error {
 			s.logger.Printf("[ERRO] [GPU-%d] failed to create receiver on %s: %v", i, gpuAddr, err)
 			continue
 		}
-		defer r.Close()
+		defer func() { _ = r.Close() }()
 		s.logger.Printf("[INFO] [GPU-%d] listening on %s, ports %d-%d", i, gpuAddr, s.conf.ServerPortRange.Min, s.conf.ServerPortRange.Max)
 		go s.readLoop(ctx, r, gpuSenders, i)
 	}

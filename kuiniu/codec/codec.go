@@ -46,7 +46,6 @@ func Encode(seq uint64, salt []byte, ts int64, msgLen int,
 	binary.BigEndian.PutUint16(data[off:off+2], lastStartSrcPort)
 	off += 2
 	binary.BigEndian.PutUint16(data[off:off+2], lastStartDstPort)
-	off += 2
 
 	if saltLen > 0 {
 		n := min(saltLen, len(salt))
