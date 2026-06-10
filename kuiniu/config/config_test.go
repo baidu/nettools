@@ -16,23 +16,9 @@ func TestValidateBoth(t *testing.T) {
 		Role:           RoleBoth,
 		LocalGPUAddrs:  []string{"10.0.0.1"},
 		RemoteGPUAddrs: []string{"10.0.1.1"},
-		LocalCPUAddr:   "192.168.1.1",
-		RemoteCPUAddr:  "192.168.1.2",
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("unexpected error for role both: %v", err)
-	}
-}
-
-func TestValidateBothMissingRemoteCPUAddr(t *testing.T) {
-	cfg := &Config{
-		Role:           RoleBoth,
-		LocalGPUAddrs:  []string{"10.0.0.1"},
-		RemoteGPUAddrs: []string{"10.0.1.1"},
-		LocalCPUAddr:   "192.168.1.1",
-	}
-	if err := cfg.Validate(); err == nil {
-		t.Fatal("expected error for missing remote_cpu_addr with role both")
 	}
 }
 
@@ -41,8 +27,6 @@ func TestValidateClientMissingGPUAddrs(t *testing.T) {
 		Role:           RoleClient,
 		LocalGPUAddrs:  []string{},
 		RemoteGPUAddrs: []string{"10.0.1.1"},
-		LocalCPUAddr:   "192.168.1.1",
-		RemoteCPUAddr:  "192.168.1.2",
 	}
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("expected error for missing local_gpu_addrs")
@@ -54,23 +38,9 @@ func TestValidateClientMismatchedGPUCount(t *testing.T) {
 		Role:           RoleClient,
 		LocalGPUAddrs:  []string{"10.0.0.1", "10.0.0.2"},
 		RemoteGPUAddrs: []string{"10.0.1.1"},
-		LocalCPUAddr:   "192.168.1.1",
-		RemoteCPUAddr:  "192.168.1.2",
 	}
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("expected error for mismatched GPU count")
-	}
-}
-
-func TestValidateClientMissingRemoteCPUAddr(t *testing.T) {
-	cfg := &Config{
-		Role:           RoleClient,
-		LocalGPUAddrs:  []string{"10.0.0.1"},
-		RemoteGPUAddrs: []string{"10.0.1.1"},
-		LocalCPUAddr:   "192.168.1.1",
-	}
-	if err := cfg.Validate(); err == nil {
-		t.Fatal("expected error for missing remote_cpu_addr")
 	}
 }
 
@@ -79,24 +49,9 @@ func TestValidateClientInvalidGPUAddr(t *testing.T) {
 		Role:           RoleClient,
 		LocalGPUAddrs:  []string{"not-an-ip"},
 		RemoteGPUAddrs: []string{"10.0.1.1"},
-		LocalCPUAddr:   "192.168.1.1",
-		RemoteCPUAddr:  "192.168.1.2",
 	}
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("expected error for invalid GPU addr")
-	}
-}
-
-func TestValidateClientInvalidCPUAddr(t *testing.T) {
-	cfg := &Config{
-		Role:           RoleClient,
-		LocalGPUAddrs:  []string{"10.0.0.1"},
-		RemoteGPUAddrs: []string{"10.0.1.1"},
-		LocalCPUAddr:   "bad",
-		RemoteCPUAddr:  "192.168.1.2",
-	}
-	if err := cfg.Validate(); err == nil {
-		t.Fatal("expected error for invalid CPU addr")
 	}
 }
 
@@ -105,7 +60,6 @@ func TestValidateServerMissingGPUAddrs(t *testing.T) {
 		Role:           RoleServer,
 		LocalGPUAddrs:  []string{},
 		RemoteGPUAddrs: []string{"10.0.1.1"},
-		LocalCPUAddr:   "192.168.1.1",
 	}
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("expected error for missing server local_gpu_addrs")
@@ -117,8 +71,6 @@ func TestValidateValidClient(t *testing.T) {
 		Role:           RoleClient,
 		LocalGPUAddrs:  []string{"10.0.0.1"},
 		RemoteGPUAddrs: []string{"10.0.1.1"},
-		LocalCPUAddr:   "192.168.1.1",
-		RemoteCPUAddr:  "192.168.1.2",
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -148,8 +100,6 @@ func TestValidateCustomPortRange(t *testing.T) {
 		Role:               RoleClient,
 		LocalGPUAddrs:      []string{"10.0.0.1"},
 		RemoteGPUAddrs:     []string{"10.0.1.1"},
-		LocalCPUAddr:       "192.168.1.1",
-		RemoteCPUAddr:      "192.168.1.2",
 		ClientPortRangeStr: "50000,50100",
 		ServerPortRangeStr: "50000,50010",
 	}

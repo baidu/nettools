@@ -30,9 +30,7 @@ func main() {
 	var (
 		role           string
 		localGPUAddrs  string
-		localCPUAddr   string
 		remoteGPUAddrs string
-		remoteCPUAddr  string
 		tos            int
 		count          int
 		sendDuration   time.Duration
@@ -50,9 +48,7 @@ func main() {
 
 	pflag.StringVarP(&role, "role", "r", "", "Role: client, server, or both")
 	pflag.StringVarP(&localGPUAddrs, "local-gpu", "", "", "Comma-separated local GPU IP addresses")
-	pflag.StringVar(&localCPUAddr, "local-cpu", "", "Local CPU NIC IP address")
 	pflag.StringVarP(&remoteGPUAddrs, "remote-gpu", "", "", "Comma-separated remote GPU IP addresses")
-	pflag.StringVar(&remoteCPUAddr, "remote-cpu", "", "Remote CPU NIC IP address")
 	pflag.IntVarP(&tos, "tos", "t", 64, "IP TOS/DSCP value")
 	pflag.IntVarP(&count, "count", "n", 0, "Max packets to send per GPU pair (0 = unlimited)")
 	pflag.DurationVarP(&sendDuration, "duration", "d", 0, "Max send duration (0 = unlimited)")
@@ -110,14 +106,8 @@ func main() {
 	if localGPUAddrs != "" {
 		cfg.LocalGPUAddrs = splitNonEmpty(localGPUAddrs)
 	}
-	if localCPUAddr != "" {
-		cfg.LocalCPUAddr = localCPUAddr
-	}
 	if remoteGPUAddrs != "" {
 		cfg.RemoteGPUAddrs = splitNonEmpty(remoteGPUAddrs)
-	}
-	if remoteCPUAddr != "" {
-		cfg.RemoteCPUAddr = remoteCPUAddr
 	}
 	if pprofAddr != "" {
 		cfg.PprofAddr = pprofAddr

@@ -16,17 +16,23 @@ import (
 	"github.com/smallnest/goscapy/pkg/packet"
 )
 
-// Server listens for probe packets on GPU NICs and echoes them back via CPU NIC.
+// Server listens for probe packets on GPU NICs and echoes them back via GPU NIC.
 type Server struct {
 	conf          *config.Config
 	statProcessor *stat.Processor
 	logger        *log.Logger
 	sender        stat.Sender
 	salts         *util.Salts
+	localGPUSet   map[string]struct{}
 
 	mu    sync.RWMutex
 	stats map[string]stat.Stat // keyed by client GPU IP
 }
+
+// noopSender is a silent Sender that discards all stat results.
+type noopSender struct{}
+
+func (*noopSender) Send(stat.StatResult) {}
 
 // New creates a Server with the given configuration.
 func New(conf *config.Config, statProcessor *stat.Processor, sender stat.Sender, logger *log.Logger) *Server {
@@ -34,7 +40,12 @@ func New(conf *config.Config, statProcessor *stat.Processor, sender stat.Sender,
 		conf.MsgLen = codec.MsgHeaderLen
 	}
 	if sender == nil {
-		sender = stat.NewLogSender(logger, conf.Verbose)
+		sender = &noopSender{}
+	}
+
+	localSet := make(map[string]struct{}, len(conf.LocalGPUAddrs))
+	for _, addr := range conf.LocalGPUAddrs {
+		localSet[addr] = struct{}{}
 	}
 
 	s := &Server{
@@ -44,33 +55,37 @@ func New(conf *config.Config, statProcessor *stat.Processor, sender stat.Sender,
 		sender:        sender,
 		salts:         util.NewSalts(conf.MsgLen - codec.MsgHeaderLen),
 		stats:         make(map[string]stat.Stat),
+		localGPUSet:   localSet,
 	}
 
-	// Pre-register client GPU IPs from config
-	for _, addr := range conf.RemoteGPUAddrs {
-		st := stat.NewServerStat(addr, conf.LocalCPUAddr,
+	for i, addr := range conf.RemoteGPUAddrs {
+		st := stat.NewServerStat(addr, conf.LocalGPUAddrs[i],
 			conf.ClientPortRange, conf.ServerPortRange,
-			conf.RateInSpan, conf.Span, conf.Delay, s.sender)
+			conf.RateInSpan, conf.Span, conf.Delay, sender)
 		statProcessor.AddStat(st)
 		s.stats[addr] = st
-		s.logger.Printf("[INFO] prepare client GPU: %s", addr)
+		s.logger.Printf("[INFO] [server] prepared client GPU: %s", addr)
 	}
 
 	return s
 }
 
-// Run starts GPU receivers and CPU sender. It blocks until ctx is cancelled.
+// Run starts GPU receivers and GPU echo senders. It blocks until ctx is cancelled.
 func (s *Server) Run(ctx context.Context) error {
-	s.logger.Printf("[INFO] [server] creating CPU sender on %s...", s.conf.LocalCPUAddr)
+	s.logger.Printf("[INFO] [server] creating GPU senders...")
 
-	localCPUIP := net.ParseIP(s.conf.LocalCPUAddr)
-	cpuSender, err := transport.NewUDPSender(localCPUIP, s.conf.TOS, 64, s.logger)
-	if err != nil {
-		s.logger.Printf("[ERRO] [server] failed to create CPU sender on %s: %v", localCPUIP, err)
-		return err
+	gpuSenders := make(map[int]transport.Sender)
+	for i, gpuAddr := range s.conf.LocalGPUAddrs {
+		gpuIP := net.ParseIP(gpuAddr)
+		sender, err := transport.NewUDPSender(gpuIP, s.conf.TOS, 64, s.logger)
+		if err != nil {
+			s.logger.Printf("[ERRO] [GPU-%d] failed to create sender on %s: %v", i, gpuAddr, err)
+			return err
+		}
+		gpuSenders[i] = sender
+		defer sender.Close()
+		s.logger.Printf("[INFO] [GPU-%d] sender bound to %s (TOS=%d)", i, gpuIP, s.conf.TOS)
 	}
-	defer cpuSender.Close()
-	s.logger.Printf("[INFO] [server] CPU sender bound to %s", localCPUIP)
 
 	// Create GPU receivers — one per GPU IP
 	s.logger.Printf("[INFO] [server] creating GPU receivers...")
@@ -83,7 +98,7 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 		defer r.Close()
 		s.logger.Printf("[INFO] [GPU-%d] listening on %s, ports %d-%d", i, gpuAddr, s.conf.ServerPortRange.Min, s.conf.ServerPortRange.Max)
-		go s.readLoop(ctx, r, cpuSender, i)
+		go s.readLoop(ctx, r, gpuSenders, i)
 	}
 
 	s.logger.Printf("[INFO] [server] all GPU receivers started, %d listening", len(s.conf.LocalGPUAddrs))
@@ -91,7 +106,7 @@ func (s *Server) Run(ctx context.Context) error {
 	return nil
 }
 
-func (s *Server) readLoop(ctx context.Context, r transport.Receiver, cpuSender transport.Sender, gpuIndex int) {
+func (s *Server) readLoop(ctx context.Context, r transport.Receiver, gpuSenders map[int]transport.Sender, gpuIndex int) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -103,11 +118,11 @@ func (s *Server) readLoop(ctx context.Context, r transport.Receiver, cpuSender t
 		if err != nil {
 			continue
 		}
-		s.handlePacket(data, remote, cpuSender, gpuIndex)
+		s.handlePacket(data, remote, gpuSenders, gpuIndex)
 	}
 }
 
-func (s *Server) handlePacket(rawPkt []byte, remote net.Addr, cpuSender transport.Sender, gpuIndex int) {
+func (s *Server) handlePacket(rawPkt []byte, remote net.Addr, gpuSenders map[int]transport.Sender, gpuIndex int) {
 	parsed, err := packet.DissectByProto(rawPkt, "UDP")
 	if err != nil {
 		return
@@ -128,6 +143,15 @@ func (s *Server) handlePacket(rawPkt []byte, remote net.Addr, cpuSender transpor
 
 	r := codec.Decode(payload)
 
+	// Skip packets that originated from one of our own local GPUs.
+	// In role=both, raw sockets receive both inbound probes from peer
+	// machines and echoes of our own outbound probes; the latter must
+	// not be re-echoed (loop) or recorded as inbound traffic.
+	clientGPUIP := net.IP(r.SrcIP).String()
+	if _, ours := s.localGPUSet[clientGPUIP]; ours {
+		return
+	}
+
 	// Detect server-side bitflip
 	hasBitflip := false
 	if len(payload) == s.conf.MsgLen {
@@ -144,20 +168,19 @@ func (s *Server) handlePacket(rawPkt []byte, remote net.Addr, cpuSender transpor
 	}
 
 	// Record server-side stats
-	clientGPUIP := net.IP(r.SrcIP).String()
 	st := s.getOrCreateStat(clientGPUIP)
 	if st != nil {
 		st.ReceivedAndFix(r.Seq, r.Ts, 0, r.LastSentCount, r.LastStartSrcPort, r.LastStartDstPort, hasBitflip)
 	}
 
-	// Echo back via CPU network to the client's CPU address
-	targetCPUIP := net.ParseIP(s.conf.RemoteCPUAddr)
-	if targetCPUIP == nil {
+	// Echo back via GPU NIC to the client's GPU address
+	sender := gpuSenders[gpuIndex]
+	if sender == nil {
 		return
 	}
-
-	// Echo the payload back via CPU NIC
-	_ = cpuSender.Send(context.Background(), net.ParseIP(s.conf.LocalCPUAddr), targetCPUIP, r.DstPort, r.SrcPort, payload)
+	clientGPUIPNet := net.IP(r.SrcIP)
+	serverGPUIPNet := net.ParseIP(s.conf.LocalGPUAddrs[gpuIndex])
+	_ = sender.Send(context.Background(), serverGPUIPNet, clientGPUIPNet, r.DstPort, r.SrcPort, payload)
 }
 
 func (s *Server) getOrCreateStat(clientGPUIP string) stat.Stat {
@@ -176,7 +199,7 @@ func (s *Server) getOrCreateStat(clientGPUIP string) stat.Stat {
 	}
 
 	s.logger.Printf("[INFO] [server] auto-register client GPU: %s", clientGPUIP)
-	st = stat.NewServerStat(clientGPUIP, s.conf.LocalCPUAddr,
+	st = stat.NewServerStat(clientGPUIP, s.conf.LocalGPUAddrs[0],
 		s.conf.ClientPortRange, s.conf.ServerPortRange,
 		s.conf.RateInSpan, s.conf.Span, s.conf.Delay, s.sender)
 	s.statProcessor.AddStat(st)

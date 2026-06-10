@@ -39,7 +39,7 @@ func unpackPorts(v uint32) (local, server uint16) {
 	return uint16(v >> 16), uint16(v)
 }
 
-// Client sends probe packets from GPU NICs and receives echoes on CPU NIC.
+// Client sends probe packets from GPU NICs and receives echoes on GPU NICs.
 type Client struct {
 	conf          *config.Config
 	limiter       ratelimit.Limiter
@@ -48,7 +48,7 @@ type Client struct {
 	sender        stat.Sender
 	salts         *util.Salts
 	peers         []*gpuPeer
-	cpuReceivers  []transport.Receiver
+	gpuReceivers  []transport.Receiver
 	delayBitflip  time.Duration
 }
 
@@ -86,7 +86,7 @@ func NewClient(conf *config.Config, limiter ratelimit.Limiter,
 		}
 		p.ports.Store(packPorts(uint16(conf.ClientPortRange.Min), uint16(conf.ServerPortRange.Min)))
 
-		s := stat.NewStat(conf.LocalCPUAddr, conf.RemoteGPUAddrs[i],
+		s := stat.NewStat(conf.LocalGPUAddrs[i], conf.RemoteGPUAddrs[i],
 			conf.ClientPortRange, conf.ServerPortRange,
 			conf.RateInSpan, conf.Span, conf.Delay, c.sender)
 		statProcessor.AddStat(s)
@@ -99,7 +99,7 @@ func NewClient(conf *config.Config, limiter ratelimit.Limiter,
 	return c, nil
 }
 
-// Run starts the client: opens GPU senders and CPU receivers, then enters the send loop.
+// Run starts the client: opens GPU senders and GPU receivers, then enters the send loop.
 func (c *Client) Run(ctx context.Context) error {
 	c.logger.Printf("[INFO] [client] creating GPU senders...")
 
@@ -115,30 +115,31 @@ func (c *Client) Run(ctx context.Context) error {
 		c.logger.Printf("[INFO] [GPU-%d] sender bound to %s (TOS=%d)", p.gpuIndex, p.localGPUIP, c.conf.TOS)
 	}
 
-	c.logger.Printf("[INFO] [client] creating CPU receivers on %s...", c.conf.LocalCPUAddr)
+	c.logger.Printf("[INFO] [client] creating GPU receivers...")
 
 	pr := c.conf.ClientPortRange
 	portCount := pr.Max - pr.Min + 1
 	gcount := min(portCount, 8)
 	portsPerG := (portCount + gcount - 1) / gcount
 
-	localCPUIP := net.ParseIP(c.conf.LocalCPUAddr)
-	for i := pr.Min; i <= pr.Max; i += portsPerG {
-		upper := i + portsPerG - 1
-		if upper > pr.Max {
-			upper = pr.Max
+	for _, p := range c.peers {
+		for i := pr.Min; i <= pr.Max; i += portsPerG {
+			upper := i + portsPerG - 1
+			if upper > pr.Max {
+				upper = pr.Max
+			}
+			r, err := transport.NewUDPReceiver(p.localGPUIP, c.conf.TOS, config.PortRange{Min: i, Max: upper}, c.logger)
+			if err != nil {
+				c.logger.Printf("[ERRO] [GPU-%d] failed to create receiver on %s (ports %d-%d): %v", p.gpuIndex, p.localGPUIP, i, upper, err)
+				return err
+			}
+			c.gpuReceivers = append(c.gpuReceivers, r)
+			defer r.Close()
+			c.logger.Printf("[INFO] [GPU-%d] receiver on %s, ports %d-%d", p.gpuIndex, p.localGPUIP, i, upper)
 		}
-		r, err := transport.NewUDPReceiver(localCPUIP, c.conf.TOS, config.PortRange{Min: i, Max: upper}, c.logger)
-		if err != nil {
-			c.logger.Printf("[ERRO] [client] failed to create CPU receiver on %s (ports %d-%d): %v", localCPUIP, i, upper, err)
-			return err
-		}
-		c.cpuReceivers = append(c.cpuReceivers, r)
-		defer r.Close()
-		c.logger.Printf("[INFO] [client] CPU receiver on %s, ports %d-%d", localCPUIP, i, upper)
 	}
 
-	for _, r := range c.cpuReceivers {
+	for _, r := range c.gpuReceivers {
 		go c.readLoop(ctx, r)
 	}
 
@@ -306,7 +307,7 @@ func (c *Client) detectBitflip(p *gpuPeer, payload, salt []byte, r codec.DecodeR
 
 // Close closes all receivers.
 func (c *Client) Close() {
-	for _, r := range c.cpuReceivers {
+	for _, r := range c.gpuReceivers {
 		_ = r.Close()
 	}
 }

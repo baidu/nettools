@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -52,9 +51,7 @@ type Config struct {
 	Role Role `json:"role"`
 
 	LocalGPUAddrs  []string `json:"local_gpu_addrs"`
-	LocalCPUAddr   string   `json:"local_cpu_addr"`
 	RemoteGPUAddrs []string `json:"remote_gpu_addrs"`
-	RemoteCPUAddr  string   `json:"remote_cpu_addr"`
 
 	TOS             int       `json:"tos"`
 	ClientPortRange PortRange `json:"-"`
@@ -73,26 +70,6 @@ type Config struct {
 	SendDuration time.Duration `json:"-"`
 	SendDurStr   string        `json:"send_duration"`
 	Verbose      bool          `json:"verbose"`
-}
-
-func resolveLocalIP() (string, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return "", fmt.Errorf("failed to get hostname: %w", err)
-	}
-	addrs, err := net.LookupHost(hostname)
-	if err != nil {
-		return "", fmt.Errorf("failed to lookup %q: %w", hostname, err)
-	}
-	for _, addr := range addrs {
-		if ip := net.ParseIP(addr); ip != nil && !ip.IsLoopback() {
-			return addr, nil
-		}
-	}
-	if len(addrs) > 0 {
-		return addrs[0], nil
-	}
-	return "", fmt.Errorf("no address found for hostname %q", hostname)
 }
 
 func (c *Config) Validate() error {
@@ -114,37 +91,15 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("local_gpu_addrs (%d) and remote_gpu_addrs (%d) must have the same count",
 				len(c.LocalGPUAddrs), len(c.RemoteGPUAddrs))
 		}
-		if c.LocalCPUAddr == "" {
-			ip, err := resolveLocalIP()
-			if err != nil {
-				return fmt.Errorf("local_cpu_addr not provided and failed to resolve local IP: %w", err)
+		for i, addr := range c.LocalGPUAddrs {
+			if ip := net.ParseIP(addr); ip == nil || ip.To4() == nil {
+				return fmt.Errorf("invalid local_gpu_addrs[%d] %q: not a valid IPv4 address", i, addr)
 			}
-			c.LocalCPUAddr = ip
 		}
-	}
-
-	if needsClient {
-		if c.RemoteCPUAddr == "" {
-			return fmt.Errorf("remote_cpu_addr is required for client role")
-		}
-	}
-
-	for i, addr := range c.LocalGPUAddrs {
-		if ip := net.ParseIP(addr); ip == nil || ip.To4() == nil {
-			return fmt.Errorf("invalid local_gpu_addrs[%d] %q: not a valid IPv4 address", i, addr)
-		}
-	}
-	for i, addr := range c.RemoteGPUAddrs {
-		if ip := net.ParseIP(addr); ip == nil || ip.To4() == nil {
-			return fmt.Errorf("invalid remote_gpu_addrs[%d] %q: not a valid IPv4 address", i, addr)
-		}
-	}
-	if ip := net.ParseIP(c.LocalCPUAddr); ip == nil || ip.To4() == nil {
-		return fmt.Errorf("invalid local_cpu_addr %q: not a valid IPv4 address", c.LocalCPUAddr)
-	}
-	if c.RemoteCPUAddr != "" {
-		if ip := net.ParseIP(c.RemoteCPUAddr); ip == nil || ip.To4() == nil {
-			return fmt.Errorf("invalid remote_cpu_addr %q: not a valid IPv4 address", c.RemoteCPUAddr)
+		for i, addr := range c.RemoteGPUAddrs {
+			if ip := net.ParseIP(addr); ip == nil || ip.To4() == nil {
+				return fmt.Errorf("invalid remote_gpu_addrs[%d] %q: not a valid IPv4 address", i, addr)
+			}
 		}
 	}
 
