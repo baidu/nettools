@@ -10,10 +10,8 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -21,6 +19,7 @@ import (
 	"github.com/baidu/nettools/sonar/config"
 	"github.com/baidu/nettools/sonar/server"
 	"github.com/baidu/nettools/stat"
+	"github.com/baidu/nettools/util"
 	"github.com/baidu/nettools/version"
 	"go.uber.org/ratelimit"
 )
@@ -100,10 +99,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	var logWriter *rotateWriter
+	var logWriter *util.RotateWriter
 	if cfg.LogDir != "" {
-		logWriter = setupLog(cfg.LogDir, cfg.LogMaxAgeDays)
-		defer logWriter.Close()
+		maxAge := cfg.LogMaxAgeDays
+		if maxAge <= 0 {
+			maxAge = 7
+		}
+		w, err := util.NewRotateWriter(cfg.LogDir, "baize.log", maxAge)
+		if err != nil {
+			log.Fatalf("[FATAL] setup log: %v", err)
+		}
+		logWriter = w
+		log.SetOutput(logWriter)
+		defer func() { _ = logWriter.Close() }()
 	}
 
 	if cfg.PprofAddr != "" {
@@ -233,83 +241,6 @@ func runServer(ctx context.Context, cancel context.CancelFunc, cfg *serverConfig
 	s := server.New(conf, proc, nil, logger)
 	log.Printf("[INFO] server %s for clients %v", conf.ServerAddr(), conf.ClientAddrs)
 	s.Run(ctx)
-}
-
-// rotateWriter writes to date-stamped log files with daily rotation
-// and a symlink pointing to the current file.
-type rotateWriter struct {
-	dir    string
-	maxAge int
-	mu     sync.Mutex
-	file   *os.File
-	date   string
-}
-
-func (w *rotateWriter) Write(p []byte) (int, error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	today := time.Now().Format("20060102")
-	if today != w.date {
-		if w.file != nil {
-			_ = w.file.Close()
-			w.file = nil
-		}
-		name := "baize.log." + today
-		f, err := os.OpenFile(filepath.Join(w.dir, name), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			w.date = ""
-			return 0, fmt.Errorf("open log file: %w", err)
-		}
-		w.file = f
-		w.date = today
-		link := filepath.Join(w.dir, "baize.log")
-		_ = os.Remove(link)
-		_ = os.Symlink(name, link)
-		w.clean()
-	}
-	if w.file == nil {
-		return 0, fmt.Errorf("log file not open")
-	}
-	return w.file.Write(p)
-}
-
-func (w *rotateWriter) Close() {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	if w.file != nil {
-		_ = w.file.Close()
-	}
-}
-
-func (w *rotateWriter) clean() {
-	if w.maxAge <= 0 {
-		return
-	}
-	cutoff := time.Now().AddDate(0, 0, -w.maxAge)
-	entries, _ := os.ReadDir(w.dir)
-	for _, e := range entries {
-		if !strings.HasPrefix(e.Name(), "baize.log.") {
-			continue
-		}
-		info, err := e.Info()
-		if err != nil || info.ModTime().After(cutoff) {
-			continue
-		}
-		_ = os.Remove(filepath.Join(w.dir, e.Name()))
-	}
-}
-
-func setupLog(dir string, maxAgeDays int) *rotateWriter {
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		log.Fatalf("[FATAL] mkdir %s: %v", dir, err)
-	}
-	if maxAgeDays <= 0 {
-		maxAgeDays = 7
-	}
-	w := &rotateWriter{dir: dir, maxAge: maxAgeDays}
-	log.SetOutput(w)
-	return w
 }
 
 func parseDuration(s string) time.Duration {
