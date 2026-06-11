@@ -10,6 +10,7 @@ BINARYBA := baize
 BINARYMP  := mping
 BINARYMP6 := mping6
 BINARYKN  := kuiniu
+BINARYEVR := evr
 COVERAGE_FILE := coverage.out
 COVERAGE_HTML := coverage.html
 
@@ -32,7 +33,7 @@ prepare:
 	go mod download
 
 # make compile
-compile: build build6 build-baize build-mping build-mping6 build-kuiniu
+compile: build build6 build-baize build-mping build-mping6 build-kuiniu build-evr
 build:
 	go build -ldflags "$(LDFLAGS)" -o $(HOMEDIR)/$(BINARY) ./cmd/bitflip/
 
@@ -51,6 +52,10 @@ build-mping6:
 build-kuiniu:
 	mkdir -p $(OUTDIR)
 	go build -ldflags "$(LDFLAGS)" -o $(OUTDIR)/$(BINARYKN) ./cmd/kuiniu/
+
+build-evr:
+	mkdir -p $(OUTDIR)
+	go build -ldflags "$(LDFLAGS)" -o $(OUTDIR)/$(BINARYEVR) ./cmd/evr/
 
 ## test: Run all tests
 test: prepare
@@ -200,5 +205,5 @@ help:
 
 .PHONY: all prepare compile test test-short test-race test-coverage treemap test-verbose benchmark \
         test-codec test-stat test-client test-server test-config \
-        lint fmt fmt-check vet check clean tidy install-tools ci help build build6 build-baize build-mping build-mping6 build-kuiniu package \
+        lint fmt fmt-check vet check clean tidy install-tools ci help build build6 build-baize build-mping build-mping6 build-kuiniu build-evr package \
         snapshot deploy

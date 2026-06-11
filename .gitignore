@@ -14,6 +14,11 @@ mping6
 !mping6/
 kuiniu
 !kuiniu/
+evr
+!evr/
+
+# Runtime logs
+log/
 
 # Test and coverage artifacts
 coverage.html

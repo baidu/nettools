@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_No unreleased changes._
+### Added
+- **evr**: VXLAN-based EVR device probing tool (`cmd/evr`)
+  - Sends UDP/VXLAN probes to one or more EVR VTEPs from a single raw `ip4:udp` socket
+  - "Self-loop" inner frame design: inner src/dst IPs both equal the local probe address while the real EVR src IP is embedded in the payload, so reflected responses can be matched back to the originating target without a 5-tuple key
+  - `targets` config in `vtep#evrSrc[#mockSrc]` form, with optional spoofed outer src per-target
+  - Reuses `stat.Processor` / `stat.NewStat` / `stat.LogSender` for per-target loss/latency reporting and `util.RotateWriter` for daily-rotated logs
+  - BPF prefilter on inner UDP dst port + IPv4 TOS for the read socket
+  - Salt-based bit-flip detection via the shared `util.Salts`
+  - Built atop `goscapy` for VXLAN/Ethernet/IPv4/UDP encoding (no `gopacket` dependency)
+  - JSON config file (`cmd/evr/evr.example.json`) and `make build-evr` target
+  - Unit tests for codec round-trip and config parsing/validation
 
 ## [0.4.0] - 2026-06-10
 

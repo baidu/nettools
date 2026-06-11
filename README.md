@@ -15,6 +15,7 @@ A suite of network diagnostic tools developed by Baidu's physical network black-
 - **lidar**: TCP SYN probing tool for network reachability detection — no server-side deployment required.
 - **mping**: Multi-target ICMP Echo ping tool with CIDR expansion, DNS resolution, hardware timestamping, and packet corruption detection.
 - **mping6**: IPv6 variant of mping for ICMPv6 Echo probing with packet corruption detection.
+- **evr**: VXLAN-based EVR device probing tool — embeds the real EVR src IP in the payload so reflected probes can be matched back without a 5-tuple key.
 
 > Produced by Baidu System Department
 
