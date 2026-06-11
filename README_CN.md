@@ -15,6 +15,7 @@
 - **lidar**: TCP SYN 网络可达性探测工具，无需在远端部署任何软件。
 - **mping**: 多目标 ICMP Echo 批量 ping 工具，支持 CIDR 展开、DNS 解析、硬件时间戳和改包检测。
 - **mping6**: mping 的 IPv6 版本，用于 ICMPv6 Echo 探测，支持改包检测。
+- **evr**: 基于 VXLAN 的 EVR 设备探测工具——通过把 EVR 真实源 IP 内嵌在 payload 中，借助 EVR 自身的 VXLAN 反射做无对端探测，单机即可部署。
 
 > 百度系统部出品
 
@@ -465,6 +466,100 @@ sudo ./lidar -t 10.0.0.2 -p 80 -v
 | `timeout` | 未收到响应的探测包数量（目标不可达/丢包） |
 
 详见 [lidar 使用指南](docs/lidar.html)。
+
+## evr
+
+基于 VXLAN 的 **EVR（边缘虚拟路由器）** 设备探测工具。借助 EVR 自身的 VXLAN 反射能力——探测机构造一个 UDP/VXLAN 包，内层 Ethernet/IPv4/UDP 帧的内层 src 和 dst IP 都填本机探测 IP，再把真实的 EVR 源 IP 写入 payload，使得反射回来的探测包能够直接被本机原始套接字接收，并通过 payload 内嵌的源 IP 反查归因到具体目标。**无需对端运行 server 进程**——EVR 设备本身就是反射点。
+
+**工作原理：** 探测进程通过 `ipv4.NewRawConn` 自建外层 IPv4 头（这样 `mock_src` 源地址伪造才能生效），封装 VXLAN 头 + 内层 Ethernet/IPv4/UDP 帧——内层 src/dst 都填本机 IP，并把 EVR 真实源 IP 写在 payload[24:28]。EVR 反射的内层报文直接命中本机 socket，`peerByEVRSrc` 映射把每个回包归因到具体目标。读 socket 上挂 BPF 预过滤（按内层 UDP 目的端口 + IPv4 TOS 匹配），廉价丢弃无关流量。
+
+**核心特性：**
+- **自环内层帧设计：** 内层 src == 内层 dst == 本机 IP，EVR 反射回来的包直接落到探测 socket，免去额外路由配置和对端服务。
+- **payload 内嵌 EVR 源 IP：** 真实 EVR src IP 写在 payload[24:28]，单 socket 同时监控多个 EVR，回包通过 `peerByEVRSrc` 精确归因。
+- **`mock_src` 源地址伪造：** 通过 `IP_HDRINCL` + `ipv4.NewRawConn` 自建外层 IPv4 头，每个目标可独立伪造 outer src IP，灵活验证 EVR 在不同源地址下的转发策略。
+- **4-Salt bitflip 检测：** 复用 baize/kuiniu 同款 4 种 Salt 填充模式，覆盖 VXLAN 隧道+EVR 反射全路径上 校验和漏检的比特翻转。
+- **JSON 配置 + CLI 覆盖：** 与 baize/kuiniu 相同的运维方式——JSON 文件为权威配置，CLI flag 仅覆盖显式传入的字段（`pflag.Visit`）。
+- **日志按天轮转 + pprof：** 复用 `util.RotateWriter`，内置 pprof 端点。
+
+### 快速开始
+
+**编译：**
+```bash
+go build -o evr ./cmd/evr/
+```
+
+**创建配置文件**（如 `evr.json`）：
+```json
+{
+  "id": "evr-probe-1",
+  "client_addr": "203.0.113.10",
+  "targets": "198.51.100.96#192.0.2.1#203.0.113.99,198.51.100.97#192.0.2.2#203.0.113.99",
+  "dst_port": 4789,
+  "inner_dst_port": 8972,
+  "src_mac": "00:00:00:00:ff:ff",
+  "dst_mac": "00:00:5e:00:01:ff",
+  "vni": 15990000,
+  "tos": 64,
+  "ttl": 64,
+  "client_port_range": "63000,63999",
+  "rate_in_span": 2000,
+  "span": "1s",
+  "delay": "5s",
+  "msg_len": 1024,
+  "log_dir": "./log",
+  "log_max_age_days": 3
+}
+```
+
+每个 target 形如 `vtep#evrSrc[#mockSrc]`：
+- `vtep`：外层目的 IP（EVR VTEP 地址）。
+- `evrSrc`：真实 EVR 源 IP，内嵌到 payload 中用于回包归因。
+- `mockSrc`（可选）：外层伪造源 IP，省略时使用 `client_addr`。
+
+**运行：**
+```bash
+# 使用 JSON 配置（命令行参数会覆盖配置项）
+sudo ./evr -c evr.json
+
+# 纯命令行模式（单目标）
+sudo ./evr --client-addr 203.0.113.10 \
+  --targets 198.51.100.96#192.0.2.1
+```
+
+### 命令行参数
+
+| 短参数 | 长参数 | 默认值 | 说明 |
+|--------|--------|--------|------|
+| `-c` | `--config` | "" | JSON 配置文件路径（命令行参数会覆盖配置项） |
+| | `--id` | "" | Agent 标识符（用于日志） |
+| | `--client-addr` | 自动检测 | 本机 IPv4，作为外层源地址 |
+| `-t` | `--targets` | — | 逗号分隔的目标列表，格式 `vtep#evrSrc[#mockSrc]` |
+| | `--dst-port` | 4789 | 外层 UDP 目的端口 |
+| | `--inner-dst-port` | 8972 | 内层 UDP 目的端口 |
+| | `--src-mac` | `00:00:00:00:ff:ff` | 内层以太网源 MAC |
+| | `--dst-mac` | `00:00:5e:00:01:ff` | 内层以太网目的 MAC |
+| | `--vni` | 15990000 | VXLAN Network Identifier |
+| | `--tos` | 0 | IPv4 TOS/DSCP（同时作用于外层和内层 IP） |
+| | `--ttl` | 64 | IPv4 TTL（同时作用于外层和内层 IP） |
+| | `--client-port-range` | "9981,9981" | 外层源 UDP 端口范围，如 `63000,63999` |
+| | `--rate-in-span` | 1 | 所有目标合计每个 span 的发包数 |
+| `-s` | `--span` | 100ms | 统计报告间隔 |
+| | `--delay` | 100ms | 统计窗口最终化前的延迟 |
+| | `--msg-len` | 28 | 内层 UDP 载荷长度（包头 + salt） |
+| | `--pprof` | "" | pprof 监听地址（如 `:6060`） |
+| | `--log-dir` | "" | 日志目录（启用按日轮转） |
+| | `--log-max-age` | 3 | 日志保留天数 |
+| `-v` | `--verbose` | false | 打印逐端口丢包详情 |
+| `-V` | `--version` | false | 打印版本信息 |
+
+### 使用场景
+
+- **EVR 设备健康度监控：** 通过 EVR 自身的 VXLAN 反射做持续探测——单机部署、无需远端软件。
+- **VXLAN 隧道路径监控：** 探测外层 VXLAN 隧道到 EVR 的丢包和比特翻转。
+- **多 EVR 并发对比：** 一个探测进程同时覆盖多个 EVR（每个 EVR 一个 `vtep#evrSrc`），`peerByEVRSrc` 保证每个目标的统计互不干扰。
+- **虚拟网络 NIC bitflip 检测：** 4-Salt 方案暴露 VXLAN/UDP 校验和漏检的互补比特翻转。
+
+详见 [evr 使用指南](docs/evr.html)。
 
 ## 测试
 

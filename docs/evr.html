@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>evr 使用指南</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #FAF9F6;
+      min-height: 100vh;
+      padding: 2.5rem 2rem;
+      color: #1a1a1a;
+    }
+    .container { max-width: 1000px; margin: 0 auto; }
+    .header { margin-bottom: 2.5rem; }
+    .header-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.375rem; }
+    .pulse-dot {
+      width: 10px; height: 10px;
+      background: #2D8E9E;
+      border-radius: 50%;
+      animation: pulse 2.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(0.9); }
+    }
+    h1 { font-size: 1.375rem; font-weight: 700; letter-spacing: -0.02em; color: #1a1a1a; }
+    .subtitle { color: #8B8680; font-size: 0.8125rem; margin-left: 1.625rem; letter-spacing: 0.01em; }
+    .diagram-desc {
+      color: #B0AAA4; font-size: 0.6875rem;
+      margin-top: 0.5rem; margin-left: 1.625rem;
+      line-height: 1.5; font-style: italic;
+    }
+    .back-link {
+      display: inline-block; margin-top: 0.75rem; margin-left: 1.625rem;
+      font-size: 0.75rem; color: #2D8E9E;
+      text-decoration: none; transition: color 0.2s;
+    }
+    .back-link:hover { color: #D97757; }
+    h2 {
+      font-size: 1.125rem; font-weight: 700; color: #1a1a1a;
+      margin-top: 2.5rem; margin-bottom: 1rem;
+      padding-bottom: 0.5rem; border-bottom: 1px solid #E8E4DE;
+    }
+    h3 {
+      font-size: 0.9375rem; font-weight: 600; color: #1a1a1a;
+      margin-top: 1.5rem; margin-bottom: 0.75rem;
+    }
+    p { color: #4A4540; font-size: 0.8125rem; line-height: 1.7; margin-bottom: 0.75rem; }
+    .section {
+      background: #FFFFFF; border-radius: 12px;
+      border: 1px solid #E8E4DE;
+      padding: 1.5rem 1.75rem; margin-bottom: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.02);
+    }
+    .section-title { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+    .section-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .section-dot.terracotta { background: #D97757; }
+    .section-dot.sage { background: #5B8A72; }
+    .section-dot.slate { background: #6B7280; }
+    .section-dot.plum { background: #8B6F8A; }
+    .section-dot.rose { background: #C96464; }
+    .section-dot.teal { background: #2D8E9E; }
+    .section-title h3 { margin: 0; font-size: 0.875rem; }
+    pre {
+      background: #1a1a1a; border-radius: 8px;
+      padding: 1rem 1.25rem; overflow-x: auto;
+      margin: 0.75rem 0; font-size: 0.75rem; line-height: 1.6;
+    }
+    code { font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace; color: #E8E4DE; }
+    .inline-code {
+      background: #F5F3F0; border: 1px solid #E8E4DE;
+      border-radius: 4px; padding: 0.125rem 0.375rem;
+      font-size: 0.75rem; color: #2D8E9E;
+    }
+    .comment { color: #6B7280; }
+    .flag { color: #D97757; }
+    .value { color: #5B8A72; }
+    .key { color: #2D8E9E; }
+    .cmd { color: #E8E4DE; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.75rem; margin: 0.75rem 0; }
+    th {
+      background: #F7F6F4; font-weight: 600; text-align: left;
+      padding: 0.625rem 0.75rem; color: #4A4540;
+      border-bottom: 1px solid #E8E4DE;
+    }
+    td { padding: 0.5rem 0.75rem; color: #4A4540; border-bottom: 1px solid #F0EDE8; }
+    tr:hover td { background: #FDFCFB; }
+    .badge {
+      display: inline-block; padding: 0.125rem 0.5rem;
+      border-radius: 4px; font-size: 0.6875rem; font-weight: 500;
+    }
+    .badge-probe { background: #F0F8F8; color: #2D8E9E; border: 1px solid #2D8E9E; }
+    .badge-vxlan { background: #FFF5F0; color: #D97757; border: 1px solid #D97757; }
+    .badge-spoof { background: #F5F3F8; color: #8B6F8A; border: 1px solid #8B6F8A; }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem; margin-top: 1rem;
+    }
+    .card {
+      background: #FFFFFF; border-radius: 10px;
+      border: 1px solid #E8E4DE; padding: 1.125rem 1.25rem;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.625rem; }
+    .card-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .card-dot.terracotta { background: #D97757; }
+    .card-dot.sage { background: #5B8A72; }
+    .card-dot.slate { background: #6B7280; }
+    .card-dot.plum { background: #8B6F8A; }
+    .card-dot.rose { background: #C96464; }
+    .card-dot.teal { background: #2D8E9E; }
+    .card h4 { font-size: 0.8125rem; font-weight: 600; color: #1a1a1a; }
+    .card ul { list-style: none; color: #6B6560; font-size: 0.75rem; line-height: 1.7; }
+    .card li { margin-bottom: 0.25rem; }
+    .note {
+      background: #FFF5F0; border-left: 3px solid #D97757;
+      border-radius: 0 8px 8px 0; padding: 0.75rem 1rem;
+      font-size: 0.75rem; color: #6B6560; margin: 0.75rem 0;
+    }
+    .note strong { color: #D97757; }
+    .tip {
+      background: #F0F8F8; border-left: 3px solid #2D8E9E;
+      border-radius: 0 8px 8px 0; padding: 0.75rem 1rem;
+      font-size: 0.75rem; color: #6B6560; margin: 0.75rem 0;
+    }
+    .tip strong { color: #2D8E9E; }
+    .footer { text-align: center; margin-top: 2rem; color: #B0AAA4; font-size: 0.6875rem; letter-spacing: 0.02em; }
+    .toc {
+      background: #FDFCFB; border: 1px solid #E8E4DE;
+      border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 2rem;
+    }
+    .toc h3 { font-size: 0.8125rem; margin-top: 0; margin-bottom: 0.75rem; color: #8B8680; }
+    .toc ul { list-style: none; font-size: 0.75rem; }
+    .toc li { margin-bottom: 0.375rem; }
+    .toc a { color: #2D8E9E; text-decoration: none; transition: color 0.2s; }
+    .toc a:hover { color: #D97757; }
+    .ascii-diagram {
+      background: #FDFCFB; border: 1px solid #E8E4DE;
+      border-radius: 8px; padding: 1rem 1.25rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.7rem; line-height: 1.5;
+      color: #4A4540; white-space: pre; overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>evr 使用指南</h1>
+      </div>
+      <p class="subtitle">nettools · 基于 VXLAN 的 EVR 设备探测工具</p>
+      <p class="diagram-desc"><b>Usage Guide</b> — 通过"自环内层帧 + payload 内嵌 EVR 源 IP"的巧妙设计，让 EVR 反射回包能直接对应到原始目标。</p>
+      <a class="back-link" href="index.html">← 返回首页</a>
+    </div>
+
+    <!-- TOC -->
+    <div class="toc">
+      <h3>目录</h3>
+      <ul>
+        <li><a href="#overview">1. 概述</a></li>
+        <li><a href="#design">2. 巧妙的设计：自环内层帧 + payload 内嵌 EVR 源 IP</a></li>
+        <li><a href="#packet">3. 报文结构</a></li>
+        <li><a href="#scenarios">4. 使用场景</a></li>
+        <li><a href="#comparison">5. 与 baize / kuiniu 的区别</a></li>
+        <li><a href="#install">6. 安装</a></li>
+        <li><a href="#quickstart">7. 快速开始</a></li>
+        <li><a href="#config">8. 配置文件详解</a></li>
+        <li><a href="#cli">9. 命令行参数</a></li>
+        <li><a href="#examples">10. 使用示例</a></li>
+        <li><a href="#logging">11. 日志管理</a></li>
+        <li><a href="#faq">12. FAQ</a></li>
+      </ul>
+    </div>
+
+    <!-- Section 1: Overview -->
+    <div class="section" id="overview">
+      <div class="section-title">
+        <div class="section-dot teal"></div>
+        <h3>1. 概述</h3>
+      </div>
+      <p>
+        <span class="badge badge-probe">Probe</span>
+        <span class="badge badge-vxlan">VXLAN</span>
+        <span class="badge badge-spoof">SrcIP Spoof</span>
+        evr 是面向 <strong>EVR（Edge Virtual Router）设备</strong>的链路探测工具。它向一个或多个 EVR VTEP 发送 UDP/VXLAN 探测包，每个探测包内层都封装了一个完整的以太网/IPv4/UDP 帧；EVR 在收到 VXLAN 后会把内层帧"反射"回探测端。evr 通过解析反射回来的内层帧来评估 EVR 设备的丢包、延迟、bitflip。
+      </p>
+      <p>
+        evr 的核心是一种<strong>"自环内层帧"</strong>设计：内层 src IP 与 dst IP 都填本机地址（这样 EVR 反射回来的报文会落到本机的 raw socket），同时把"原本要写在内层 src IP 上的 EVR 源 IP"<strong>嵌入在 payload</strong>，回包时按 payload 中的 IP 直接定位回原始目标，避免维护 5 元组映射。
+      </p>
+    </div>
+
+    <!-- Section 2: Design -->
+    <div class="section" id="design">
+      <div class="section-title">
+        <div class="section-dot plum"></div>
+        <h3>2. 巧妙的设计：自环内层帧 + payload 内嵌 EVR 源 IP</h3>
+      </div>
+      <p>EVR 设备的工作模型是 VXLAN VTEP：从外层 UDP/4789 收 VXLAN，把内层以太网帧解封后按内层 IP 头继续转发。如果按"自然"的设计去探测：</p>
+      <ul style="color: #4A4540; font-size: 0.8125rem; line-height: 1.7; margin-bottom: 0.75rem; padding-left: 1.5rem;">
+        <li>探测端 → EVR：内层 src IP = 探测端，dst IP = 真实业务地址</li>
+        <li>EVR 反射回来后，需要靠 (srcIP, dstIP, srcPort, dstPort) 5 元组反查原始目标</li>
+      </ul>
+      <p>这种设计在多目标场景下要维护一张端口/IP 反查表，且 ECMP 哈希会把回包打散到本机不同 IP 上，处理起来很复杂。evr 用了一个反直觉但极其精简的方案：</p>
+
+      <div class="cards">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-dot teal"></div>
+            <h4>内层 src/dst IP 都设为本机</h4>
+          </div>
+          <ul>
+            <li>EVR 反射的内层帧 dst = 本机</li>
+            <li>本机 raw socket 直接收到回包</li>
+            <li>不需要单独申请回包 IP/端口</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-dot plum"></div>
+            <h4>真实 EVR 源 IP 嵌入 payload</h4>
+          </div>
+          <ul>
+            <li>payload 头部 4 字节 = EVR srcAddr</li>
+            <li>回包按 IP 直接 <code>peerByEVRSrc[ip]</code></li>
+            <li>无需 5 元组、无需端口表</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-dot terracotta"></div>
+            <h4>外层源 IP 可 spoof</h4>
+          </div>
+          <ul>
+            <li><code>mock_src</code> 让外层 src IP 与本机不同</li>
+            <li>用 <code>ipv4.NewRawConn</code> 启用 IP_HDRINCL</li>
+            <li>多个目标可以共享同一个对外身份</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>报文匹配流程</h3>
+      <div class="ascii-diagram">  发送侧                                        回程侧
+  ┌──────────────────────────────┐               ┌──────────────────────────────┐
+  │ 外层 IP:  mock_src → vtepIP  │               │ 内层 dst = 本机              │
+  │ 外层 UDP: srcPort  → 4789    │   反射         │ ↓ raw socket 收到            │
+  │ ┌─ VXLAN(VNI) ──────────┐    │  ─────────►   │ 解析 payload[24:28]          │
+  │ │ 内层 ETH/IPv4/UDP     │    │               │ 得到 EVR 源 IP               │
+  │ │ src = 本机, dst = 本机│    │               │ peerByEVRSrc[ip] → target    │
+  │ │ payload: ... + EVR srcIP   │               │ 累加 stat                    │
+  │ └────────────────────────┘   │               └──────────────────────────────┘
+  └──────────────────────────────┘</div>
+
+      <div class="tip">
+        <strong>本质：</strong>把"目标标识"从 IP 头搬到了 payload 里，让 EVR 的 VXLAN 反射动作天然变成一次"单源对多目标"的回包匹配。代价仅仅是 4 字节 payload 占用 + 解析时多读 4 字节。
+      </div>
+    </div>
+
+    <!-- Section 3: Packet -->
+    <div class="section" id="packet">
+      <div class="section-title">
+        <div class="section-dot rose"></div>
+        <h3>3. 报文结构</h3>
+      </div>
+      <p>evr 完整探测包从外到内分为四层：</p>
+      <div class="ascii-diagram">┌──────── 外层 IPv4 (20 B) ─────────┐  src=mockSrc, dst=vtepAddr, tos=cfg.tos, ttl=cfg.ttl
+├──────── 外层 UDP   (8 B)  ────────┤  srcPort∈[port_min,port_max], dstPort=4789
+├──────── VXLAN      (8 B)  ────────┤  VNI=cfg.vni（默认 15990000）
+├──────── 内层 Eth   (14 B) ────────┤  srcMAC, dstMAC（默认 00:00:00:00:ff:ff / 00:00:5e:00:01:ff）
+├──────── 内层 IPv4  (20 B) ────────┤  src=本机, dst=本机, tos=cfg.tos, ttl=cfg.ttl
+├──────── 内层 UDP   (8 B)  ────────┤  srcPort=外层 srcPort, dstPort=8972（默认）
+└──────── EVRCHECK 协议体  ─────────┘  msg_len 字节</div>
+
+      <h3>EVRCHECK 协议头（28 B 固定 + Salt 填充）</h3>
+      <table>
+        <tr><th>偏移</th><th>长度</th><th>字段</th><th>说明</th></tr>
+        <tr><td>0</td><td>8</td><td>magic</td><td>固定 ASCII <code class="inline-code">"EVRCHECK"</code>，校验合法报文</td></tr>
+        <tr><td>8</td><td>8</td><td>seq</td><td>大端 uint64，业务序列号（每次发送原子自增）</td></tr>
+        <tr><td>16</td><td>8</td><td>ts</td><td>大端 int64，发送时间戳（纳秒）</td></tr>
+        <tr><td>24</td><td>4</td><td>srcIP</td><td><strong>EVR 源 IP（关键）</strong>——回包时据此映射回 target</td></tr>
+        <tr><td>28</td><td>N</td><td>salt</td><td>Salt 模式（按 seq%4 选 0xFF / 0x00 / 0x5A / 互补 AAAA-5555），用于探测 bitflip</td></tr>
+      </table>
+      <p>Salt 由 <code class="inline-code">util.Salts</code> 生成，与 baize/kuiniu 一致；回包时若 payload 长度等于发送长度，则与对应 Salt 比对，命中差异即记一条 <code class="inline-code">[client bitflip]</code> 日志。</p>
+    </div>
+
+    <!-- Section 4: Scenarios -->
+    <div class="section" id="scenarios">
+      <div class="section-title">
+        <div class="section-dot rose"></div>
+        <h3>4. 使用场景</h3>
+      </div>
+      <p>evr 主要面向数据中心网络中部署了 EVR/VTEP 的虚拟网络环境：</p>
+
+      <div class="cards">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-dot teal"></div>
+            <h4>EVR 设备健康度监控</h4>
+          </div>
+          <ul>
+            <li>批量探测多台 EVR 设备 / 多个 VTEP IP</li>
+            <li>持续发现 VTEP 转发路径丢包</li>
+            <li>反射延迟监控替代主动 ping</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-dot terracotta"></div>
+            <h4>VXLAN 隧道路径监控</h4>
+          </div>
+          <ul>
+            <li>验证 underlay 到 EVR VTEP 的 ECMP 是否健康</li>
+            <li>通过 srcPort 轮转覆盖 ECMP 哈希全空间</li>
+            <li>发现 underlay 丢包但 overlay 看不到的链路</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-dot plum"></div>
+            <h4>多 EVR 并发对比探测</h4>
+          </div>
+          <ul>
+            <li>一份配置探测十几个 EVR</li>
+            <li>同 mock_src 让对外身份一致</li>
+            <li>per-target 丢包/延迟/bitflip 统计</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-dot sage"></div>
+            <h4>变更前后对比</h4>
+          </div>
+          <ul>
+            <li>EVR 升级 / underlay 调整前后基线对比</li>
+            <li>找出变更引入的丢包或延迟回归</li>
+            <li>结合 stat 分桶定位短期抖动</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-dot rose"></div>
+            <h4>NIC/中间设备 bitflip 检测</h4>
+          </div>
+          <ul>
+            <li>4 种 Salt 模式覆盖互补翻转</li>
+            <li>抓出 UDP 校验和漏检的改包</li>
+            <li>对长程路径数据完整性提供网络层证据</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-dot slate"></div>
+            <h4>VTEP 容量压测旁路监控</h4>
+          </div>
+          <ul>
+            <li>压测期间常态化跑 evr</li>
+            <li>实时观察 VTEP 在压力下是否开始丢包</li>
+            <li>结合 pprof 监控发送端自身瓶颈</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 5: Comparison -->
+    <div class="section" id="comparison">
+      <div class="section-title">
+        <div class="section-dot slate"></div>
+        <h3>5. 与 baize / kuiniu 的区别</h3>
+      </div>
+      <p>三者都用于"长期常驻 + JSON 配置驱动 + 共享 stat/log 体系"的网络探测，但探测对象与封装层次差别很大：</p>
+      <table>
+        <tr><th>特性</th><th>baize</th><th>kuiniu</th><th>evr</th></tr>
+        <tr><td>面向网络</td><td>通用 IP 网络</td><td>GPU NIC 互联（RoCE）</td><td><strong>VXLAN/EVR 虚拟网络</strong></td></tr>
+        <tr><td>报文形态</td><td>UDP</td><td>RoCEv2/UDP</td><td><strong>VXLAN 封装的内层 ETH/IPv4/UDP</strong></td></tr>
+        <tr><td>地址模型</td><td>client_addr + server_addrs</td><td>local_gpu_addrs / remote_gpu_addrs</td><td><strong>targets: vtep#evrSrc[#mockSrc]</strong></td></tr>
+        <tr><td>需要服务端进程吗</td><td>需要 baize server</td><td>需要 kuiniu（role=server / both）</td><td><strong>不需要——EVR 设备本身就是反射器</strong></td></tr>
+        <tr><td>响应匹配</td><td>5 元组 / 端口表</td><td>GPU 对 + 端口</td><td><strong>payload 内嵌 EVR srcIP</strong></td></tr>
+        <tr><td>外层源 IP</td><td>本机</td><td>本机 GPU NIC</td><td><strong>可 spoof 为 mock_src</strong></td></tr>
+        <tr><td>典型部署</td><td>baize.json 长期监控</td><td>两台机器对称部署</td><td>单机即可，常驻探测多台 EVR</td></tr>
+      </table>
+      <div class="tip">
+        <strong>怎么选：</strong>普通业务网络长期监控用 <strong>baize</strong>；AI 训练 GPU 互联用 <strong>kuiniu</strong>；机房 VXLAN/EVR 路径与 EVR 设备本身的探测用 <strong>evr</strong>（不需要在对端起 server）。
+      </div>
+    </div>
+
+    <!-- Section 6: Install -->
+    <div class="section" id="install">
+      <div class="section-title">
+        <div class="section-dot terracotta"></div>
+        <h3>6. 安装</h3>
+      </div>
+
+      <h3>从源码编译</h3>
+      <pre><code><span class="comment"># 克隆仓库</span>
+<span class="cmd">git clone https://github.com/baidu/nettools.git</span>
+<span class="cmd">cd nettools</span>
+
+<span class="comment"># 编译全部工具</span>
+<span class="cmd">make compile</span>
+
+<span class="comment"># 或单独编译 evr</span>
+<span class="cmd">make build-evr</span>
+<span class="cmd">go build -o evr ./cmd/evr/</span></code></pre>
+
+      <h3>使用 GoReleaser 构建发行版</h3>
+      <pre><code><span class="comment"># 本地测试构建 (snapshot)</span>
+<span class="cmd">make snapshot</span>
+
+<span class="comment"># 正式发布 (需要 git tag + GITHUB_TOKEN)</span>
+<span class="cmd">git tag v0.5.0</span>
+<span class="cmd">make deploy</span></code></pre>
+
+      <div class="tip">
+        <strong>Tip：</strong>evr 仅在 Linux 上有意义（依赖 raw socket + IP_HDRINCL）。macOS 仅作为开发/编译环境，运行时会报 <code class="inline-code">socket: operation not permitted</code>。
+      </div>
+
+      <h3>支持的平台</h3>
+      <table>
+        <tr><th>操作系统</th><th>架构</th><th>支持</th></tr>
+        <tr><td>Linux</td><td>AMD64</td><td>&#10003; 生产可用</td></tr>
+        <tr><td>Linux</td><td>ARM64</td><td>&#10003; 生产可用</td></tr>
+        <tr><td>macOS</td><td>AMD64 / ARM64</td><td>仅开发/编译</td></tr>
+      </table>
+    </div>
+
+    <!-- Section 7: Quick Start -->
+    <div class="section" id="quickstart">
+      <div class="section-title">
+        <div class="section-dot sage"></div>
+        <h3>7. 快速开始</h3>
+      </div>
+
+      <h3>1. 准备配置</h3>
+      <p>仓库 <code class="inline-code">cmd/evr/evr.example.json</code> 提供了一份脱敏的示例配置。每一项 target 用 <code class="inline-code">vtep#evrSrc[#mockSrc]</code> 三段式表达：</p>
+      <pre><code>{
+  <span class="key">"id"</span>: <span class="value">"evr-probe-1"</span>,
+  <span class="key">"client_addr"</span>: <span class="value">"203.0.113.10"</span>,
+  <span class="key">"targets"</span>: <span class="value">"198.51.100.96#192.0.2.1#203.0.113.99,198.51.100.97#192.0.2.2#203.0.113.99"</span>,
+  <span class="key">"vni"</span>: <span class="value">15990000</span>,
+  <span class="key">"tos"</span>: <span class="value">64</span>,
+  <span class="key">"ttl"</span>: <span class="value">64</span>,
+  <span class="key">"client_port_range"</span>: <span class="value">"63000,63999"</span>,
+  <span class="key">"rate_in_span"</span>: <span class="value">2000</span>,
+  <span class="key">"span"</span>: <span class="value">"1s"</span>,
+  <span class="key">"delay"</span>: <span class="value">"5s"</span>,
+  <span class="key">"msg_len"</span>: <span class="value">1024</span>,
+  <span class="key">"log_dir"</span>: <span class="value">"./log"</span>,
+  <span class="key">"log_max_age_days"</span>: <span class="value">3</span>
+}</code></pre>
+
+      <h3>2. 启动 evr</h3>
+      <pre><code><span class="comment"># 使用配置文件启动（推荐）</span>
+<span class="cmd">sudo ./evr</span> <span class="flag">-c</span> <span class="value">/etc/evr/evr.json</span>
+
+<span class="comment"># 也可以全部用命令行参数（临时排查）</span>
+<span class="cmd">sudo ./evr</span> \
+  <span class="flag">--client-addr</span> <span class="value">203.0.113.10</span> \
+  <span class="flag">--targets</span> <span class="value">198.51.100.96#192.0.2.1#203.0.113.99</span> \
+  <span class="flag">--rate-in-span</span> <span class="value">2000</span> \
+  <span class="flag">--span</span> <span class="value">1s</span></code></pre>
+
+      <div class="note">
+        <strong>Note：</strong>evr 需要 <code class="inline-code">sudo</code>（或 <code class="inline-code">CAP_NET_RAW</code>）来创建 raw IP 套接字、设置 IP_HDRINCL 与 IP TOS。线上推荐 systemd 以 root 启动并指定 <code class="inline-code">log_dir</code>。
+      </div>
+
+      <h3>3. CLI 覆盖配置文件</h3>
+      <p>所有 CLI 参数在显式传入时会覆盖 JSON 配置中的同名字段（pflag.Visit 模式），便于自动化系统按需调整：</p>
+      <pre><code><span class="cmd">sudo ./evr</span> <span class="flag">-c</span> <span class="value">/etc/evr/evr.json</span> \
+  <span class="flag">--rate-in-span</span> <span class="value">5000</span> \
+  <span class="flag">--verbose</span></code></pre>
+    </div>
+
+    <!-- Section 8: Config -->
+    <div class="section" id="config">
+      <div class="section-title">
+        <div class="section-dot plum"></div>
+        <h3>8. 配置文件详解</h3>
+      </div>
+
+      <h3>顶层字段</h3>
+      <table>
+        <tr><th>字段</th><th>类型</th><th>默认值</th><th>说明</th></tr>
+        <tr><td><code class="inline-code">id</code></td><td>string</td><td>""</td><td>探测端标识，仅用于日志区分</td></tr>
+        <tr><td><code class="inline-code">client_addr</code></td><td>string</td><td>auto</td><td>本机外层源 IP（IPv4），未填时自动探测主机名对应地址</td></tr>
+        <tr><td><code class="inline-code">targets</code></td><td>string</td><td>必填</td><td>目标列表，逗号分隔；每项 <code class="inline-code">vtep#evrSrc[#mockSrc]</code></td></tr>
+        <tr><td><code class="inline-code">dst_port</code></td><td>uint16</td><td>4789</td><td>外层 UDP 目的端口（VXLAN 标准端口）</td></tr>
+        <tr><td><code class="inline-code">inner_dst_port</code></td><td>uint16</td><td>8972</td><td>内层 UDP 目的端口（兼用作 BPF 过滤条件）</td></tr>
+        <tr><td><code class="inline-code">src_mac</code></td><td>string</td><td>00:00:00:00:ff:ff</td><td>内层以太帧源 MAC</td></tr>
+        <tr><td><code class="inline-code">dst_mac</code></td><td>string</td><td>00:00:5e:00:01:ff</td><td>内层以太帧目的 MAC</td></tr>
+        <tr><td><code class="inline-code">vni</code></td><td>uint32</td><td>15990000</td><td>VXLAN VNI（24 位）</td></tr>
+        <tr><td><code class="inline-code">tos</code></td><td>int</td><td>0</td><td>外层 + 内层 IPv4 TOS/DSCP（同时也是 BPF 过滤条件）</td></tr>
+        <tr><td><code class="inline-code">ttl</code></td><td>int</td><td>64</td><td>外层 + 内层 IPv4 TTL</td></tr>
+        <tr><td><code class="inline-code">client_port_range</code></td><td>string</td><td>"9981,9981"</td><td>外层源端口范围 <code class="inline-code">min,max</code></td></tr>
+        <tr><td><code class="inline-code">rate_in_span</code></td><td>int64</td><td>1</td><td>每个 span 内 <strong>所有 target 总发包数</strong></td></tr>
+        <tr><td><code class="inline-code">span</code></td><td>string</td><td>"100ms"</td><td>统计时间窗口</td></tr>
+        <tr><td><code class="inline-code">delay</code></td><td>string</td><td>"100ms"</td><td>统计延迟，等在途报文回来</td></tr>
+        <tr><td><code class="inline-code">msg_len</code></td><td>int</td><td>必填</td><td>内层 UDP payload 长度（含 28 B 协议头）</td></tr>
+        <tr><td><code class="inline-code">pprof_addr</code></td><td>string</td><td>""</td><td>pprof HTTP 监听地址（如 <code class="inline-code">:6060</code>）</td></tr>
+        <tr><td><code class="inline-code">log_dir</code></td><td>string</td><td>""</td><td>日志目录，为空则只打 stderr</td></tr>
+        <tr><td><code class="inline-code">log_max_age_days</code></td><td>int</td><td>3</td><td>日志保留天数</td></tr>
+        <tr><td><code class="inline-code">verbose</code></td><td>bool</td><td>false</td><td>打印每个端口的丢包详情</td></tr>
+      </table>
+
+      <div class="note">
+        <strong>Note：</strong><code class="inline-code">rate_in_span</code> 是<strong>所有 target 总速率</strong>。例如 12 个 target、<code class="inline-code">rate_in_span=2000</code>、<code class="inline-code">span=1s</code>，则每个 target 平均 ~166 pps。
+      </div>
+
+      <h3>targets 三段式</h3>
+      <table>
+        <tr><th>段</th><th>必填</th><th>含义</th></tr>
+        <tr><td>vtepIP</td><td>是</td><td>EVR VTEP 的 IPv4 地址（外层 IP 目的地址）</td></tr>
+        <tr><td>evrSrcIP</td><td>是</td><td>"目标"标识，会被嵌入 payload，用于回包匹配</td></tr>
+        <tr><td>mockSrcIP</td><td>否</td><td>外层源 IP；为空则用 <code class="inline-code">client_addr</code></td></tr>
+      </table>
+    </div>
+
+    <!-- Section 9: CLI -->
+    <div class="section" id="cli">
+      <div class="section-title">
+        <div class="section-dot terracotta"></div>
+        <h3>9. 命令行参数</h3>
+      </div>
+      <p>所有 CLI 参数都对应 JSON 配置中同名字段，显式传参时会覆盖 JSON：</p>
+      <table>
+        <tr><th>参数</th><th>简写</th><th>含义</th></tr>
+        <tr><td>--config</td><td>-c</td><td>JSON 配置文件路径</td></tr>
+        <tr><td>--id</td><td></td><td>探测端标识</td></tr>
+        <tr><td>--client-addr</td><td></td><td>本机外层源 IP</td></tr>
+        <tr><td>--targets</td><td>-t</td><td><code>vtep#evrSrc[#mockSrc]</code> 列表</td></tr>
+        <tr><td>--dst-port</td><td></td><td>外层 UDP 目的端口（默认 4789）</td></tr>
+        <tr><td>--inner-dst-port</td><td></td><td>内层 UDP 目的端口（默认 8972）</td></tr>
+        <tr><td>--src-mac / --dst-mac</td><td></td><td>内层以太帧 MAC</td></tr>
+        <tr><td>--vni</td><td></td><td>VXLAN VNI</td></tr>
+        <tr><td>--tos / --ttl</td><td></td><td>外层 + 内层 IP 头 TOS / TTL</td></tr>
+        <tr><td>--client-port-range</td><td></td><td>外层源端口范围 <code>min,max</code></td></tr>
+        <tr><td>--rate-in-span</td><td></td><td>每 span 总发包数</td></tr>
+        <tr><td>--span</td><td>-s</td><td>统计时间窗口</td></tr>
+        <tr><td>--delay</td><td></td><td>统计延迟</td></tr>
+        <tr><td>--msg-len</td><td></td><td>内层 UDP payload 长度</td></tr>
+        <tr><td>--pprof</td><td></td><td>pprof 监听地址</td></tr>
+        <tr><td>--log-dir / --log-max-age</td><td></td><td>日志目录与保留天数</td></tr>
+        <tr><td>--verbose</td><td>-v</td><td>打印每个端口的丢包详情</td></tr>
+        <tr><td>--version</td><td>-V</td><td>打印版本</td></tr>
+      </table>
+    </div>
+
+    <!-- Section 10: Examples -->
+    <div class="section" id="examples">
+      <div class="section-title">
+        <div class="section-dot teal"></div>
+        <h3>10. 使用示例</h3>
+      </div>
+
+      <h3>探测一台 EVR（最小用法）</h3>
+      <pre><code><span class="cmd">sudo ./evr</span> \
+  <span class="flag">--client-addr</span> <span class="value">203.0.113.10</span> \
+  <span class="flag">--targets</span> <span class="value">198.51.100.96#192.0.2.1</span> \
+  <span class="flag">--msg-len</span> <span class="value">1024</span></code></pre>
+
+      <h3>多 EVR 并发探测 + 共享 mock_src</h3>
+      <pre><code><span class="cmd">sudo ./evr</span> \
+  <span class="flag">--client-addr</span> <span class="value">203.0.113.10</span> \
+  <span class="flag">--targets</span> <span class="value">"198.51.100.96#192.0.2.1#203.0.113.99,198.51.100.97#192.0.2.2#203.0.113.99"</span> \
+  <span class="flag">--client-port-range</span> <span class="value">63000,63999</span> \
+  <span class="flag">--rate-in-span</span> <span class="value">2000</span> \
+  <span class="flag">--span</span> <span class="value">1s</span> \
+  <span class="flag">--msg-len</span> <span class="value">1024</span></code></pre>
+      <p>所有 target 都通过 <code class="inline-code">203.0.113.99</code> 这个 mock 源 IP 出去，让网络上看到的 evr 探测身份统一。</p>
+
+      <h3>带 TOS/DSCP 标记 + BPF 过滤</h3>
+      <pre><code><span class="cmd">sudo ./evr</span> <span class="flag">-c</span> <span class="value">/etc/evr/evr.json</span> \
+  <span class="flag">--tos</span> <span class="value">64</span></code></pre>
+      <p>外层和内层 IP 头都打上 TOS=64；BPF 也按 TOS=64 过滤回包，避免接收到不相关的 UDP 流量。</p>
+
+      <h3>开启 pprof 排查发送瓶颈</h3>
+      <pre><code><span class="cmd">sudo ./evr</span> <span class="flag">-c</span> <span class="value">/etc/evr/evr.json</span> \
+  <span class="flag">--pprof</span> <span class="value">":6060"</span>
+
+<span class="comment"># 然后用 go tool pprof 拉 cpu profile</span>
+<span class="cmd">go tool pprof http://localhost:6060/debug/pprof/profile?seconds=30</span></code></pre>
+
+      <h3>verbose 排查丢包</h3>
+      <pre><code><span class="cmd">sudo ./evr</span> <span class="flag">-c</span> <span class="value">/etc/evr/evr.json</span> <span class="flag">--verbose</span></code></pre>
+      <p>开启后丢包条目会列出每个 srcPort 的发送/接收次数，便于发现"特定端口（即特定 ECMP 哈希值）持续丢包"的故障。</p>
+    </div>
+
+    <!-- Section 11: Logging -->
+    <div class="section" id="logging">
+      <div class="section-title">
+        <div class="section-dot sage"></div>
+        <h3>11. 日志管理</h3>
+      </div>
+      <p>日志由 <code class="inline-code">util.RotateWriter</code> 按天轮转，与 baize / kuiniu 共用同一份实现：</p>
+      <pre><code>{
+  <span class="key">"log_dir"</span>: <span class="value">"/var/log/evr"</span>,
+  <span class="key">"log_max_age_days"</span>: <span class="value">3</span>
+}</code></pre>
+      <p>启动后日志目录形如：</p>
+      <pre><code>/var/log/evr/
+├── evr.log -&gt; evr.log.20260611    <span class="comment"># 当日符号链接</span>
+├── evr.log.20260611
+└── evr.log.20260610</code></pre>
+      <div class="tip">
+        <strong>Tip：</strong>未配置 <code class="inline-code">log_dir</code> 时只打到 stderr，适合容器化部署中由日志收集器统一采集。
+      </div>
+      <div class="note">
+        <strong>Note：</strong>日志同时写终端和文件，便于运维既能 <code class="inline-code">journalctl -u evr</code> 也能 <code class="inline-code">tail -f /var/log/evr/evr.log</code>。
+      </div>
+    </div>
+
+    <!-- Section 12: FAQ -->
+    <div class="section" id="faq">
+      <div class="section-title">
+        <div class="section-dot terracotta"></div>
+        <h3>12. FAQ</h3>
+      </div>
+
+      <h3>Q: 为什么内层 src 和 dst 都设为本机 IP？</h3>
+      <p>这样 EVR 反射回来的内层帧 dst 就是本机，本机 raw socket 直接收得到，无需在对端起 server，也不需要单独申请回包用的 IP。这是 evr 的核心"巧妙设计"，详见<a href="#design" style="color: #2D8E9E;">第 2 节</a>。</p>
+
+      <h3>Q: 那"哪个 EVR 反射回来的"怎么区分？</h3>
+      <p>把目标 EVR 的源 IP 嵌进 payload 第 24~28 字节，回包解析后用 <code class="inline-code">peerByEVRSrc[ip]</code> 一步定位到 target，不再需要 5 元组反查表。</p>
+
+      <h3>Q: mock_src 是怎么生效的？为什么内核不会把它改回去？</h3>
+      <p>evr 在写端用 <code class="inline-code">ipv4.NewRawConn(conn)</code> 包了一层，等价于打开 <code class="inline-code">IP_HDRINCL</code>。开启后内核不再自己生成 IP 头，而是原样发出我们手工拼好的外层 IPv4 头——其中 src 就是 <code class="inline-code">mock_src</code>。如果不包这一层，内核会前置一份它自己的 IP 头，导致双层 IP 封装且 mock_src 失效。</p>
+
+      <h3>Q: rate_in_span 是单 target 速率还是总速率？</h3>
+      <p>是<strong>所有 target 总速率</strong>。12 个 target、<code class="inline-code">rate_in_span=2000/s</code>，每个 target 平均 ~166 pps。要提高单 target 速率，可以减少 target 数量或调大 <code class="inline-code">rate_in_span</code>。</p>
+
+      <h3>Q: BPF 过滤都过滤了哪些字段？</h3>
+      <p>读 socket 的 BPF 程序匹配两个条件：(1) IPv4 协议号 = UDP；(2) IPv4 TOS = <code class="inline-code">cfg.tos</code>；(3) UDP 目的端口 = <code class="inline-code">inner_dst_port</code>。三个条件同时命中才放行，确保不被同机器其他 UDP 流量打扰。写 socket 上则装一个"全丢"的 BPF，以阻止内核给这个发送 socket 排队任何回包。</p>
+
+      <h3>Q: 4 种 Salt 模式为什么这么选？</h3>
+      <p>0xFF 全 1 暴露任何变 0 的位翻转；0x00 全 0 暴露任何变 1 的位翻转；0x5A 交替位 (01011010) 适合 NIC 串行链路上的奇偶错误；互补 0xAAAA / 0x5555 专门覆盖 1's complement 校验和漏检的"互补翻转"——这是普通 UDP/TCP checksum 唯一无法察觉的一类 bitflip。</p>
+
+      <h3>Q: 为什么 evr 要用 sudo？</h3>
+      <p>需要创建 <code class="inline-code">ip4:udp</code> raw socket、启用 <code class="inline-code">IP_HDRINCL</code>、设置 IP TOS/DSCP，且要装 BPF。Linux 上需要 <code class="inline-code">CAP_NET_RAW</code>；最简单的就是 sudo 或 systemd 以 root 启动。</p>
+
+      <h3>Q: 配置文件改了要重启吗？</h3>
+      <p>需要。evr 不支持热加载。建议 systemd 管理：<code class="inline-code">sudo systemctl restart evr</code>。</p>
+
+      <h3>Q: 怎么优雅停止？</h3>
+      <p>发送 SIGINT (Ctrl+C) 或 SIGTERM。程序会取消所有 goroutine 并睡眠 1 秒等在途报文回来后退出。</p>
+
+      <h3>Q: macOS 能跑吗？</h3>
+      <p>仅作为编译/开发环境。运行时 macOS 不允许 <code class="inline-code">ip4:udp</code> raw socket 与 IP_HDRINCL 的组合，会报 <code class="inline-code">socket: operation not permitted</code>。生产请用 Linux。</p>
+    </div>
+
+    <p class="footer">nettools · Baidu System Department · github.com/baidu/nettools</p>
+  </div>
+</body>
+</html>

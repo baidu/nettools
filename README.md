@@ -474,6 +474,100 @@ sudo ./lidar -t 10.0.0.2 -p 80 -v
 
 See [lidar usage guide](docs/lidar.html) for more details.
 
+## evr
+
+A VXLAN-based probing tool for **EVR (edge virtual router)** devices. evr leverages the EVR's own VXLAN reflection capability — the probe machine constructs a UDP/VXLAN packet whose inner Ethernet/IPv4/UDP frame has its inner src and dst IP both set to the local probe IP, then embeds the real EVR src IP inside the payload so reflected probes can be matched back to the originating target without a 5-tuple key. **No server-side process required** — the EVR device itself does the reflecting.
+
+**How it works:** The probe builds the outer IPv4 header itself via `ipv4.NewRawConn` (so `mock_src` source-IP spoofing is honored), wraps a VXLAN header + inner Ethernet/IPv4/UDP frame whose inner src/dst both equal the local IP, and writes the EVR's real src IP into payload bytes [24:28]. When the EVR reflects the inner frame, it lands directly on the local probe socket; a `peerByEVRSrc` map attributes each response back to the right target. A BPF prefilter on the read socket matches by inner UDP dst port + IPv4 TOS to drop unrelated traffic cheaply.
+
+**Key features:**
+- **Self-loop inner frame:** Inner src == inner dst == local IP, so EVR reflection lands on the probe socket without extra routing or remote-side software.
+- **Payload-embedded EVR src IP:** Real EVR src IP at payload[24:28] enables single-socket multi-target probing with response-to-target attribution via `peerByEVRSrc`.
+- **`mock_src` source-IP spoofing:** `IP_HDRINCL` via `ipv4.NewRawConn` lets you forge the outer src IP per-target — useful for validating EVR forwarding policy across source addresses.
+- **4-Salt bit-flip detection:** Reuses baize/kuiniu's 4-pattern salt scheme to catch flips that VXLAN/UDP checksums miss.
+- **JSON config + CLI override:** Same operations pattern as baize/kuiniu — JSON file is authoritative, CLI flags override only what you set explicitly (`pflag.Visit`).
+- **Daily log rotation + pprof:** Shared `util.RotateWriter` and built-in pprof endpoint.
+
+### Quick Start
+
+**Build:**
+```bash
+go build -o evr ./cmd/evr/
+```
+
+**Create a config file** (e.g., `evr.json`):
+```json
+{
+  "id": "evr-probe-1",
+  "client_addr": "203.0.113.10",
+  "targets": "198.51.100.96#192.0.2.1#203.0.113.99,198.51.100.97#192.0.2.2#203.0.113.99",
+  "dst_port": 4789,
+  "inner_dst_port": 8972,
+  "src_mac": "00:00:00:00:ff:ff",
+  "dst_mac": "00:00:5e:00:01:ff",
+  "vni": 15990000,
+  "tos": 64,
+  "ttl": 64,
+  "client_port_range": "63000,63999",
+  "rate_in_span": 2000,
+  "span": "1s",
+  "delay": "5s",
+  "msg_len": 1024,
+  "log_dir": "./log",
+  "log_max_age_days": 3
+}
+```
+
+Each target is `vtep#evrSrc[#mockSrc]`:
+- `vtep`: outer destination IP (the EVR VTEP).
+- `evrSrc`: real EVR source IP, embedded into the payload for response matching.
+- `mockSrc` (optional): outer source IP to spoof; defaults to `client_addr`.
+
+**Run:**
+```bash
+# Use a JSON config (CLI flags override config values)
+sudo ./evr -c evr.json
+
+# Pure CLI mode (single target)
+sudo ./evr --client-addr 203.0.113.10 \
+  --targets 198.51.100.96#192.0.2.1
+```
+
+### Command-line Flags
+
+| Short | Long | Default | Description |
+|-------|------|---------|-------------|
+| `-c` | `--config` | "" | JSON config file path (CLI flags override config values) |
+| | `--id` | "" | Free-form agent identifier (used in logs) |
+| | `--client-addr` | auto | Local IPv4 used as the outer source (auto-detected if empty) |
+| `-t` | `--targets` | — | Comma-separated targets in `vtep#evrSrc[#mockSrc]` form |
+| | `--dst-port` | 4789 | Outer UDP destination port |
+| | `--inner-dst-port` | 8972 | Inner UDP destination port |
+| | `--src-mac` | `00:00:00:00:ff:ff` | Inner Ethernet source MAC |
+| | `--dst-mac` | `00:00:5e:00:01:ff` | Inner Ethernet destination MAC |
+| | `--vni` | 15990000 | VXLAN Network Identifier |
+| | `--tos` | 0 | IPv4 TOS/DSCP applied on outer and inner IP layers |
+| | `--ttl` | 64 | IPv4 TTL applied on outer and inner IP layers |
+| | `--client-port-range` | "9981,9981" | Outer source UDP port range, e.g. `63000,63999` |
+| | `--rate-in-span` | 1 | Probe packets per span across all targets |
+| `-s` | `--span` | 100ms | Statistics reporting interval |
+| | `--delay` | 100ms | Delay before finalising a stats bucket |
+| | `--msg-len` | 28 | Inner UDP payload length in bytes (header + salt) |
+| | `--pprof` | "" | pprof listen address (e.g. `:6060`) |
+| | `--log-dir` | "" | Log directory for rotated log files |
+| | `--log-max-age` | 3 | Max days to keep log files |
+| `-v` | `--verbose` | false | Print per-port loss details |
+| `-V` | `--version` | false | Print version and exit |
+
+### Use Cases
+
+- **EVR device health monitoring:** Continuous probing of EVR devices via their own VXLAN reflection — single-machine deployment, no remote software required.
+- **VXLAN tunnel path monitoring:** Detect loss and bit-flip on the outer VXLAN tunnel path to/from the EVR.
+- **Multi-EVR concurrent comparison:** One probe process covers many EVRs (each with its own `vtep#evrSrc` pair); `peerByEVRSrc` keeps per-target stats clean.
+- **NIC bit-flip detection on virtual networks:** 4-Salt scheme exposes complementary flips that VXLAN/UDP checksums miss.
+
+See [evr usage guide](docs/evr.html) for more details.
+
 ## Testing
 
 ```bash
