@@ -11,6 +11,7 @@ BINARYMP  := mping
 BINARYMP6 := mping6
 BINARYKN  := kuiniu
 BINARYEVR := evr
+BINARYTR  := traceroute
 COVERAGE_FILE := coverage.out
 COVERAGE_HTML := coverage.html
 
@@ -33,7 +34,7 @@ prepare:
 	go mod download
 
 # make compile
-compile: build build6 build-baize build-mping build-mping6 build-kuiniu build-evr
+compile: build build6 build-baize build-mping build-mping6 build-kuiniu build-evr build-traceroute
 build:
 	go build -ldflags "$(LDFLAGS)" -o $(HOMEDIR)/$(BINARY) ./cmd/bitflip/
 
@@ -56,6 +57,9 @@ build-kuiniu:
 build-evr:
 	mkdir -p $(OUTDIR)
 	go build -ldflags "$(LDFLAGS)" -o $(OUTDIR)/$(BINARYEVR) ./cmd/evr/
+
+build-traceroute:
+	go build -ldflags "$(LDFLAGS)" -o $(HOMEDIR)/$(BINARYTR) ./cmd/traceroute/
 
 ## test: Run all tests
 test: prepare
@@ -128,6 +132,7 @@ package:
 	mv $(BINARYBA) $(OUTDIR)/
 	mv $(BINARYMP) $(OUTDIR)/
 	mv $(BINARYMP6) $(OUTDIR)/
+	mv $(BINARYTR) $(OUTDIR)/
 	mv $(BINARYKN) $(OUTDIR)/
 	mv $(BINARYEVR) $(OUTDIR)/
 
@@ -206,5 +211,5 @@ help:
 
 .PHONY: all prepare compile test test-short test-race test-coverage treemap test-verbose benchmark \
         test-codec test-stat test-client test-server test-config \
-        lint fmt fmt-check vet check clean tidy install-tools ci help build build6 build-baize build-mping build-mping6 build-kuiniu build-evr package \
+        lint fmt fmt-check vet check clean tidy install-tools ci help build build6 build-baize build-mping build-mping6 build-kuiniu build-evr build-traceroute package \
         snapshot deploy

@@ -16,6 +16,7 @@ A suite of network diagnostic tools developed by Baidu's physical network black-
 - **mping**: Multi-target ICMP Echo ping tool with CIDR expansion, DNS resolution, hardware timestamping, and packet corruption detection.
 - **mping6**: IPv6 variant of mping for ICMPv6 Echo probing with packet corruption detection.
 - **evr**: VXLAN-based EVR device probing tool — embeds the real EVR src IP in the payload so reflected probes can be matched back without a 5-tuple key.
+- **traceroute**: Hop-by-hop path probing tool with ICMP/UDP/TCP probes, concurrent multi-TTL and multi-target probing, and per-hop RTT/loss stats — no server-side deployment required. All packet encode/decode goes through goscapy.
 
 > Produced by Baidu System Department
 
@@ -567,6 +568,83 @@ sudo ./evr --client-addr 203.0.113.10 \
 - **NIC bit-flip detection on virtual networks:** 4-Salt scheme exposes complementary flips that VXLAN/UDP checksums miss.
 
 See [evr usage guide](docs/evr.html) for more details.
+
+## traceroute
+
+A hop-by-hop path probing tool (traceroute) for IPv4. It supports **ICMP Echo**, **UDP**, and **TCP SYN** probes, sends probes across TTLs and across multiple targets **concurrently**, and reports per-hop RTT and loss. **No server-side deployment required.** All probe construction and reply parsing go through [smallnest/goscapy](https://github.com/smallnest/goscapy) — there is no hand-rolled byte ordering or checksum logic.
+
+**How it works:** For each target, probes for TTL `1..max-hops` (with `--queries` probes each) are launched concurrently, capped by `--parallel`. Each probe is built with goscapy layers (incrementing the IP TTL) and sent via goscapy's `Sr1`, which waits for the first matching reply. Intermediate routers return **ICMP Time Exceeded**; the tool dissects the quoted original IP+L4 header (via goscapy) to attribute the reply to the correct probe. Reaching the destination is detected per protocol: ICMP Echo Reply (ICMP), ICMP Port Unreachable (UDP), or TCP SYN-ACK/RST (TCP).
+
+**Key features:**
+- **Three probe protocols:** `icmp` (default), `udp`, `tcp` — switch via `--protocol` to traverse firewalls that only permit a specific protocol.
+- **Concurrent probing:** All TTLs and targets are probed in parallel with a configurable in-flight cap (`--parallel`), greatly reducing total run time.
+- **goscapy encode/decode:** Probes are built with goscapy builders (auto checksums); replies — including the embedded original header inside ICMP errors — are parsed with `packet.Dissect`.
+- **Per-hop stats:** min/avg/max RTT and loss rate per hop; ECMP responders at the same TTL are shown inline.
+- **Optional reverse DNS:** PTR lookups per hop IP, disabled with `--no-dns`.
+
+### Quick Start
+
+**Build:**
+```bash
+go build -o traceroute ./cmd/traceroute/
+```
+
+**Run** (raw sockets require root / `CAP_NET_RAW`):
+```bash
+# ICMP traceroute (default)
+sudo ./traceroute example.com
+
+# UDP traceroute to a specific base port
+sudo ./traceroute -p udp --port 33434 8.8.8.8
+
+# TCP SYN traceroute to port 443 (good for firewall traversal)
+sudo ./traceroute -p tcp --port 443 example.com
+
+# UDP with fixed source/destination ports and a spoofed source IP
+sudo ./traceroute -p udp --port 53 --src-port 12345 --fixed-dport \
+  --src-ip 10.0.0.5 8.8.8.8
+
+# Multiple targets, concurrently
+sudo ./traceroute 8.8.8.8 1.1.1.1 example.com
+```
+
+### Command-line Flags
+
+| Short | Long | Default | Description |
+|-------|------|---------|-------------|
+| `-p` | `--protocol` | icmp | Probe protocol: `icmp`, `udp` or `tcp` |
+| `-m` | `--max-hops` | 30 | Maximum number of hops (TTL) |
+| `-q` | `--queries` | 3 | Number of probes per hop |
+| | `--port` | 33434 (udp) / 80 (tcp) | Destination port for UDP/TCP |
+| | `--src-port` | 0 | Source port for UDP/TCP probes (0 = per-probe auto) |
+| | `--fixed-dport` | false | Keep UDP destination port fixed at `--port` (no per-hop increment) |
+| | `--src-ip` | auto | Override source IPv4 for UDP/TCP probes (spoofing) |
+| | `--dst-ip` | target | Override destination IPv4 written into UDP/TCP probes |
+| `-w` | `--timeout` | 1s | Per-probe timeout |
+| | `--no-dns` | false | Disable reverse-DNS resolution of hop IPs |
+| `-t` | `--tos` | 0 | IP TOS/DSCP value |
+| | `--parallel` | 16 | Max concurrent in-flight probes |
+| `-I` | `--interface` | auto | Outbound interface (auto-detected if empty) |
+| `-l` | `--local-addr` | auto | Local source IPv4 address (auto-detected if empty) |
+| `-V` | `--version` | false | Print version and exit |
+
+### Example Output
+
+```
+traceroute to example.com (93.184.216.34), 30 hops max, ICMP probes, 60 byte packets
+1   gateway (192.168.1.1)   1.234ms  1.301ms  1.122ms
+2   10.0.0.1 (10.0.0.1)   5.678ms  5.521ms  *
+3   * * *
+4   core1.isp.net (203.0.113.5)   12.345ms  12.201ms  12.503ms
+```
+
+### Use Cases
+
+- **Path discovery & hop-level fault localization:** Identify which hop introduces loss or high latency in large physical networks and AI training clusters.
+- **Firewall traversal:** Use TCP SYN (e.g. `--port 443`) or UDP probes where ICMP is rate-limited or filtered.
+- **Fast multi-target sweeps:** Concurrent probing traces many destinations in a single run.
+
+See [traceroute usage guide](docs/traceroute.html) for more details.
 
 ## Testing
 

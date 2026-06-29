@@ -1849,6 +1849,7 @@
                 <a href="kuiniu.html">kuiniu（夔牛）</a>
                 <a href="lidar.html">lidar（激光雷达）</a>
                 <a href="mping.html">mping / mping6</a>
+                <a href="traceroute.html">traceroute</a>
             </div>
 
             <!-- lidar -->
@@ -2257,6 +2258,65 @@ cd nettools && make build</span>
                     <span class="scenario-tag">割接前后对比</span>
                     <span class="scenario-tag">IPv6 网络验证</span>
                     <span class="scenario-tag">DNS 域名可达性</span>
+                </div>
+            </div>
+
+            <!-- traceroute -->
+            <div class="section" id="traceroute">
+                <div class="section-header">
+                    <div class="section-dot" style="background: #C77DFF;"></div>
+                    <h2>traceroute — 逐跳路径探测（ICMP/UDP/TCP）</h2>
+                    <span class="badge badge-new">最新发布</span>
+                    <a href="traceroute.html" class="guide-link">使用指南 &rarr;</a>
+                </div>
+
+                <p>
+                    traceroute 是逐跳路径探测工具，支持 ICMP / UDP / TCP SYN 三种探针，
+                    并发探测多个 TTL 和多个目标，输出每跳的 RTT 与丢包率，无需服务端部署。
+                    所有报文的编解码均通过 goscapy 完成。
+                </p>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🧭</div>
+                        <h4>三种探测协议</h4>
+                        <p>
+                            ICMP（默认）、UDP、TCP SYN，通过 --protocol 切换，
+                            便于穿越只放行特定协议的防火墙。
+                        </p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h4>并发探测</h4>
+                        <p>
+                            所有 TTL 与目标并行探测，--parallel 控制在途探针数量，
+                            大幅缩短整体耗时。
+                        </p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📦</div>
+                        <h4>goscapy 编解码</h4>
+                        <p>
+                            探针用 goscapy builder 构造（自动校验和），回包用
+                            packet.Dissect 解析，包括 ICMP 错误内嵌的原始报文头。
+                        </p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📊</div>
+                        <h4>逐跳统计</h4>
+                        <p>
+                            每跳输出 min/avg/max RTT 与丢包率；ECMP 同 TTL 多个回源就地展示。
+                            可选反向 DNS。
+                        </p>
+                    </div>
+                </div>
+
+                <h3>典型场景</h3>
+                <div class="scenario-tags">
+                    <span class="scenario-tag">逐跳故障定位</span>
+                    <span class="scenario-tag">ECMP 路径确认</span>
+                    <span class="scenario-tag">防火墙穿越探测</span>
+                    <span class="scenario-tag">多目标并发路径采集</span>
                 </div>
             </div>
 

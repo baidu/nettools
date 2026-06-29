@@ -16,6 +16,8 @@ kuiniu
 !kuiniu/
 evr
 !evr/
+traceroute
+!traceroute/
 
 # Runtime logs
 log/

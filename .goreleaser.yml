@@ -113,6 +113,20 @@ builds:
     ldflags:
       - -s -w -X github.com/baidu/nettools/version.Version={{.Version}} -X github.com/baidu/nettools/version.Commit={{.Commit}} -X github.com/baidu/nettools/version.Date={{.Date}}
 
+  - id: traceroute
+    main: ./cmd/traceroute
+    binary: traceroute
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X github.com/baidu/nettools/version.Version={{.Version}} -X github.com/baidu/nettools/version.Commit={{.Commit}} -X github.com/baidu/nettools/version.Date={{.Date}}
+
 archives:
   - id: default
     ids:
@@ -124,6 +138,7 @@ archives:
       - mping6
       - kuiniu
       - evr
+      - traceroute
     formats: ['tar.gz']
     name_template: >-
       {{ .ProjectName }}_
