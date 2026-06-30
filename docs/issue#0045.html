@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Implementation Notes — Issue #0045</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #FAF9F6;
+      color: #1a1a1a;
+      padding: 2.5rem 2rem;
+      line-height: 1.7;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 1.375rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .meta { color: #8B8680; font-size: 0.8125rem; margin-bottom: 2rem; }
+    h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.375rem;
+      border-bottom: 1px solid #E8E4DE;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+    }
+    .dot.design { background: #5B8A72; }
+    .dot.deviation { background: #D97757; }
+    .dot.tradeoff { background: #4A6FA5; }
+    .dot.question { background: #D4A843; }
+    .item {
+      background: #FFFFFF;
+      border: 1px solid #E8E4DE;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 0.75rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    .item h3 { font-size: 0.875rem; font-weight: 600; margin-bottom: 0.375rem; }
+    .item p { font-size: 0.8125rem; color: #4A4540; margin-bottom: 0.375rem; }
+    .label {
+      display: inline-block;
+      font-size: 0.6875rem;
+      font-weight: 500;
+      padding: 0.125rem 0.5rem;
+      border-radius: 4px;
+      margin-right: 0.375rem;
+    }
+    .label-design { background: #F5F8F6; color: #5B8A72; border: 1px solid #5B8A72; }
+    .label-deviation { background: #FFF5F0; color: #D97757; border: 1px solid #D97757; }
+    .label-tradeoff { background: #F0F4F8; color: #4A6FA5; border: 1px solid #4A6FA5; }
+    .label-question { background: #FDF8F0; color: #D4A843; border: 1px solid #D4A843; }
+    .none { color: #B0AAA4; font-style: italic; font-size: 0.8125rem; }
+    .footer {
+      text-align: center; margin-top: 2.5rem; color: #B0AAA4;
+      font-size: 0.6875rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Implementation Notes</h1>
+    <p class="meta">Issue <a href="https://github.com/baidu/nettools/issues/45">#45</a> &mdash; 结果格式化 (含 ASN/geo 注释) &mdash; 2026-06-30</p>
+
+    <h2><span class="dot design"></span> Design Decisions</h2>
+
+    <div class="item">
+      <h3><span class="label label-design">Decision</span> Reuse v4 formatInfo verbatim</h3>
+      <p><strong>Ambiguity:</strong> The annotation format <code>[AS&lt;n&gt; &lt;ASName&gt; &lt;prefix&gt; | &lt;country&gt; &lt;region&gt; &lt;city&gt;]</code> is identical between v4 and v6, and <code>enrich.IPInfo</code> is already dual-stack (#40).</p>
+      <p><strong>Choice:</strong> Copied <code>formatInfo</code> unchanged into the v6 package rather than factoring a shared helper.</p>
+      <p><strong>Rationale:</strong> The project convention is fully independent paired packages (ping/ping6, sonar/sonar6); a shared format helper would break that boundary for marginal dedup gain. The only v6-specific touch is example prefixes in the doc comment.</p>
+    </div>
+
+    <h2><span class="dot deviation"></span> Deviations</h2>
+
+    <div class="item">
+      <h3><span class="label label-deviation">Deviation</span> Header reads "traceroute6 to", Summary responder column widened</h3>
+      <p><strong>Spec:</strong> AC says header <code>traceroute6 to &lt;host&gt; (&lt;v6 addr&gt;), N hops max, &lt;proto&gt; probes</code>.</p>
+      <p><strong>Implemented:</strong> Header matches (with the v4 layout's trailing "N byte packets"); the <code>Summary()</code> responder column padding grew from <code>%-15s</code> (v4) to <code>%-39s</code> to fit a full IPv6 address.</p>
+      <p><strong>Why:</strong> 15 columns truncate/misalign v6 addresses; 39 is the max textual width of an IPv6 address, keeping the stat columns aligned.</p>
+    </div>
+
+    <h2><span class="dot tradeoff"></span> Tradeoffs</h2>
+
+    <div class="item">
+      <h3><span class="label label-tradeoff">Tradeoff</span> Inline ECMP responders vs one line per responder</h3>
+      <p><strong>Alternatives:</strong> (a) print all responders for a hop inline on the TTL line (v4 behavior); (b) emit a separate indented line per responder.</p>
+      <p><strong>Chosen:</strong> (a), matching v4 <code>writeHopLine</code> exactly — continuation responders are space-aligned inline.</p>
+      <p><strong>Why:</strong> Output parity with <code>cmd/traceroute</code> was the explicit goal (US choice 4A); diverging the layout for v6 would surprise users switching between the two tools.</p>
+    </div>
+
+    <h2><span class="dot question"></span> Open Questions</h2>
+
+    <div class="item">
+      <h3><span class="label label-question">Question</span> Summary column width with very long PTR/host names</h3>
+      <p><strong>Assumption:</strong> <code>Summary()</code> prints the raw IPv6 address (not the resolved host) in the responder column, so 39 columns always fit.</p>
+      <p><strong>Verify:</strong> Confirm this is acceptable — <code>String()</code> shows resolved hostnames, <code>Summary()</code> intentionally shows addresses for stable column alignment. No change expected.</p>
+    </div>
+
+    <p class="footer">Generated by goal-workflow /note-it</p>
+  </div>
+</body>
+</html>
