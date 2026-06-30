@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Implementation Notes — Issue #0046</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #FAF9F6;
+      color: #1a1a1a;
+      padding: 2.5rem 2rem;
+      line-height: 1.7;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 1.375rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .meta { color: #8B8680; font-size: 0.8125rem; margin-bottom: 2rem; }
+    h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.375rem;
+      border-bottom: 1px solid #E8E4DE;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+    }
+    .dot.design { background: #5B8A72; }
+    .dot.deviation { background: #D97757; }
+    .dot.tradeoff { background: #4A6FA5; }
+    .dot.question { background: #D4A843; }
+    .item {
+      background: #FFFFFF;
+      border: 1px solid #E8E4DE;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 0.75rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    .item h3 { font-size: 0.875rem; font-weight: 600; margin-bottom: 0.375rem; }
+    .item p { font-size: 0.8125rem; color: #4A4540; margin-bottom: 0.375rem; }
+    .label {
+      display: inline-block;
+      font-size: 0.6875rem;
+      font-weight: 500;
+      padding: 0.125rem 0.5rem;
+      border-radius: 4px;
+      margin-right: 0.375rem;
+    }
+    .label-design { background: #F5F8F6; color: #5B8A72; border: 1px solid #5B8A72; }
+    .label-deviation { background: #FFF5F0; color: #D97757; border: 1px solid #D97757; }
+    .label-tradeoff { background: #F0F4F8; color: #4A6FA5; border: 1px solid #4A6FA5; }
+    .label-question { background: #FDF8F0; color: #D4A843; border: 1px solid #D4A843; }
+    .none { color: #B0AAA4; font-style: italic; font-size: 0.8125rem; }
+    .footer {
+      text-align: center; margin-top: 2.5rem; color: #B0AAA4;
+      font-size: 0.6875rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Implementation Notes</h1>
+    <p class="meta">Issue <a href="https://github.com/baidu/nettools/issues/46">#46</a> &mdash; 创建 cmd/traceroute6 CLI 并接线 flag/provider &mdash; 2026-06-30</p>
+
+    <h2><span class="dot design"></span> Design Decisions</h2>
+
+    <div class="item">
+      <h3><span class="label label-design">Decision</span> Mirror cmd/traceroute flag set verbatim, swap only TOS&rarr;Traffic Class semantics</h3>
+      <p><strong>Ambiguity:</strong> The AC (US-007) says "aligned flags" but does not enumerate which flags carry v6-specific wording.</p>
+      <p><strong>Choice:</strong> Kept every flag name, shorthand, and default identical to <code>cmd/traceroute</code>. The only semantic change is <code>-t/--tos</code>, whose help text now reads "IPv6 Traffic Class value (v6 analogue of TOS/DSCP)" and feeds <code>Config.TrafficClass</code> rather than <code>Config.TOS</code>. <code>-m/--max-hops</code> wording gained "(Hop Limit)" and maps to <code>Config.HopLimit</code>.</p>
+      <p><strong>Rationale:</strong> Output/UX parity with the v4 tool was the explicit project goal (US choice 4A). Users switching between <code>traceroute</code> and <code>traceroute6</code> get a zero-surprise flag surface; only the underlying header field differs, which is invisible at the CLI.</p>
+    </div>
+
+    <div class="item">
+      <h3><span class="label label-design">Decision</span> Resolve hostnames to the first AAAA address</h3>
+      <p><strong>Ambiguity:</strong> A hostname may have both A and AAAA records; the spec doesn't say which to pick.</p>
+      <p><strong>Choice:</strong> <code>resolveTargets</code> iterates <code>net.LookupHost</code> results and picks the first address where <code>ip.To4()==nil &amp;&amp; ip.To16()!=nil</code>; IPv4-only inputs yield "not an IPv6 target (use traceroute for IPv4)".</p>
+      <p><strong>Rationale:</strong> Matches the v4 tool's "first matching family" behavior. The clear error message steers IPv4 users to the correct binary rather than silently failing.</p>
+    </div>
+
+    <h2><span class="dot deviation"></span> Deviations</h2>
+
+    <div class="item">
+      <h3><span class="label label-deviation">Deviation</span> IPv6-literal error wording differs from v4</h3>
+      <p><strong>Spec:</strong> The v4 tool rejects v6 input with "IPv6 target not supported yet".</p>
+      <p><strong>Implemented:</strong> The v6 tool rejects v4 input with "not an IPv6 target (use traceroute for IPv4): &lt;in&gt;" and rejects no-AAAA hostnames with "no IPv6 (AAAA) address for &lt;host&gt;".</p>
+      <p><strong>Why:</strong> The two tools are mirror opposites; each should point the user at its sibling. "not supported yet" would be misleading in the v6 binary, which fully supports v6.</p>
+    </div>
+
+    <h2><span class="dot tradeoff"></span> Tradeoffs</h2>
+
+    <div class="item">
+      <h3><span class="label label-tradeoff">Tradeoff</span> Duplicate main.go vs shared CLI helper</h3>
+      <p><strong>Alternatives:</strong> (a) copy <code>cmd/traceroute/main.go</code> and adapt; (b) extract a shared flag-parsing/CLI helper used by both binaries.</p>
+      <p><strong>Chosen:</strong> (a) — an independent <code>cmd/traceroute6/main.go</code>.</p>
+      <p><strong>Why:</strong> The project convention is fully independent paired packages (ping/ping6, sonar/sonar6, traceroute/traceroute6). A shared CLI helper would couple the two <code>Config</code> types (different field names: TOS vs TrafficClass, MaxHops vs HopLimit) and break that boundary for marginal dedup gain.</p>
+    </div>
+
+    <h2><span class="dot question"></span> Open Questions</h2>
+
+    <div class="item">
+      <h3><span class="label label-question">Question</span> Makefile / goreleaser / README integration</h3>
+      <p><strong>Assumption:</strong> US-007 covers only the CLI binary and flag wiring. Build-system and docs integration (Makefile package step, .goreleaser.yml entry, README/index.html, traceroute6.html usage page) appear to belong to a separate later issue, mirroring how evr was wired in #21/#35/#36.</p>
+      <p><strong>Verify:</strong> Confirm whether a follow-up issue beyond #46 exists for packaging/docs integration of <code>traceroute6</code>, or whether it should be folded into this work.</p>
+    </div>
+
+    <p class="footer">Generated by goal-workflow /note-it</p>
+  </div>
+</body>
+</html>
